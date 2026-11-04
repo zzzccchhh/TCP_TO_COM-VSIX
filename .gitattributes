@@ -1,0 +1,6 @@
+* text=auto eol=lf
+# Frozen build bytes are evidence; preserve them exactly across checkouts.
+tests/compatibility/legacy-frontend/** -text -whitespace
+*.node -text
+*.png -text
+*.vsix -text

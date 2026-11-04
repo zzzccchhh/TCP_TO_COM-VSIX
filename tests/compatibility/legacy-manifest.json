@@ -1,0 +1,22 @@
+[
+  {
+    "path": "appearance-init.js",
+    "sha256": "12701812933f4eebe1246814f202727617776f9b1e86407a6ab76a09f8535a90"
+  },
+  {
+    "path": "index.html",
+    "sha256": "0d258a84c82809887259abbecfce5b98f5d36297df21c249690f8ea7487b113f"
+  },
+  {
+    "path": "third-party-licenses.txt",
+    "sha256": "154ca108e5b9b9a2f32ade79af57900bc091746d2a27f9b7bdadfbcab5b7f611"
+  },
+  {
+    "path": "assets/index-DlFnxjUe.js",
+    "sha256": "ea7f701fb4827c7fbbea595f500f940fb7377176cdcab13174705f53dc159674"
+  },
+  {
+    "path": "assets/index-FVKmpu_-.css",
+    "sha256": "23427b6806bb09608608253568803946bea0a5e60a3f59aaa973c81d2964b4c5"
+  }
+]

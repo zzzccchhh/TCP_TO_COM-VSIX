@@ -1,0 +1,134 @@
+{
+    "name": "tcp2com",
+    "displayName": "TCP2COM · 无线串口工作台",
+    "description": "ESP-01S / ESP32-C5 / ESP32-S3 网络串口桥接、USB 配置与局域网多端工作台",
+    "version": "0.1.0",
+    "publisher": "tcp2com-local",
+    "private": true,
+    "engines": {
+        "vscode": "^1.95.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "extensionKind": [
+        "ui"
+    ],
+    "main": "./dist/src/extension.js",
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "capabilities": {
+        "untrustedWorkspaces": {
+            "supported": false
+        }
+    },
+    "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "tcp2com",
+                    "title": "TCP2COM",
+                    "icon": "media/bridge.svg"
+                }
+            ]
+        },
+        "views": {
+            "tcp2com": [
+                {
+                    "id": "tcp2com.controls",
+                    "name": "无线串口工作台"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "tcp2com.open",
+                "title": "TCP2COM: 打开工作台"
+            },
+            {
+                "command": "tcp2com.start",
+                "title": "TCP2COM: 启动后端服务"
+            },
+            {
+                "command": "tcp2com.stop",
+                "title": "TCP2COM: 停止后端服务"
+            },
+            {
+                "command": "tcp2com.share",
+                "title": "TCP2COM: 复制在线连接链接"
+            },
+            {
+                "command": "tcp2com.browser",
+                "title": "TCP2COM: 打开本地网页"
+            },
+            {
+                "command": "tcp2com.manage",
+                "title": "TCP2COM: 服务、网卡与终端管理"
+            },
+            {
+                "command": "tcp2com.logs",
+                "title": "TCP2COM: 查看服务日志"
+            },
+            {
+                "command": "tcp2com.importState",
+                "title": "TCP2COM: 导入旧版设置"
+            }
+        ],
+        "configuration": {
+            "title": "TCP2COM",
+            "properties": {
+                "tcp2com.listen": {
+                    "type": "string",
+                    "default": "0.0.0.0",
+                    "description": "网页服务监听 IPv4 地址；修改后重启服务"
+                },
+                "tcp2com.port": {
+                    "type": "number",
+                    "default": 8765,
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "网页服务端口"
+                },
+                "tcp2com.origins": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [
+                        "https://zzzccchhh.github.io"
+                    ],
+                    "description": "允许连接后端的网页来源"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "compile": "tsc -p tsconfig.json",
+        "build": "npm run build:native && npm run compile && npm --prefix frontend run build",
+        "test": "npm run build:native && npm run compile && node --test dist/tests/*.test.js",
+        "test:extension": "npm run build:native && npm run compile && node tools/test-extension.cjs",
+        "test:package": "node tools/test-package.cjs",
+        "build:native": "node tools/build-native.cjs",
+        "package": "npm run build && node tools/package.cjs",
+        "vscode:prepublish": "npm run compile"
+    },
+    "dependencies": {
+        "@serialport/bindings-cpp": "13.0.1",
+        "@serialport/stream": "13.0.0",
+        "koffi": "^3.3.6",
+        "qrcode": "^1.5.4"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.56.0",
+        "@serialport/binding-mock": "^10.2.2",
+        "@types/node": "^22.0.0",
+        "@types/qrcode": "^1.5.5",
+        "@types/vscode": "^1.95.0",
+        "@vscode/test-electron": "^2.5.0",
+        "@vscode/vsce": "4.1.0",
+        "node-gyp": "^13.1.0",
+        "prettier": "^3.9.10",
+        "typescript": "^5.9.0"
+    }
+}
