@@ -200,7 +200,7 @@ export function changedConfig(
     validateConfig(candidate, device);
     assert(
         !(device === 'c5' && candidate.link_mode === 4 && base.config_api !== 'c5-config-2'),
-        '四线 SPI 需要升级 C5 固件并重新读取',
+        'SPI传输需要升级 C5 固件并重新读取',
     );
     assert(
         !(device === 's3' && candidate.link_mode === 0 && base.link_mode !== 0 && !('reset_pin' in base)),

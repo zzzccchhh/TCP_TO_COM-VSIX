@@ -20,6 +20,7 @@ test-results/**
 tsconfig.json
 .gitignore
 .prettierrc.json
+playwright.home.config.cjs
 .vscode/**
 native/**
 !native/build/Release/tcp2com_native.node

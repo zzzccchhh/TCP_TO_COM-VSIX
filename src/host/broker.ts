@@ -2,12 +2,20 @@ import net from 'node:net';
 import { randomBytes, createHash } from 'node:crypto';
 import { readFile, mkdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Data, assert, object, parseJSON } from '../shared/model';
+import {
+    Data,
+    assert,
+    object,
+    parseJSON,
+    runtimeSettings,
+    settingsPatch,
+    defaultConfig,
+} from '../shared/model';
 import { Store, atomicJSON } from '../backend/storage/state';
 import { Service } from '../backend/service/service';
 import { LANAdapter } from '../backend/lan/adapter';
 import { LANServer } from '../backend/lan/server';
-import { Address, addresses, choose, shareLink } from '../backend/lan/network';
+import { Address, addresses, annotate, choose, shareLink } from '../backend/lan/network';
 type Options = { listen: string; port: number; origins: string[] };
 export class BackendOwner {
     readonly instance = randomBytes(16).toString('hex');
@@ -19,6 +27,9 @@ export class BackendOwner {
     private server?: net.Server;
     private sockets = new Set<net.Socket>();
     private management = Promise.resolve();
+    private scan?: { items: Address[]; warning: string; at: number };
+    private scanning?: Promise<void>;
+    private pendingOptions?: Options;
     constructor(
         readonly directory: string,
         readonly frontend: string,
@@ -37,6 +48,11 @@ export class BackendOwner {
     }
     private async start() {
         if (this.http) return true;
+        if (this.pendingOptions) {
+            Object.assign(this.options, this.pendingOptions);
+            this.pendingOptions = undefined;
+            this.scan = undefined;
+        }
         assert(
             net.isIP(this.options.listen) === 4 &&
                 Number.isInteger(this.options.port) &&
@@ -57,65 +73,223 @@ export class BackendOwner {
             );
         }
     }
-    private async status() {
-        const scan = await addresses(this.options.listen),
+    private async status(force = false) {
+        if (force || !this.scan || Date.now() - this.scan.at > 10000) {
+            if (!this.scanning)
+                this.scanning = addresses(this.options.listen)
+                    .then((value) => {
+                        this.scan = { ...value, at: Date.now() };
+                    })
+                    .finally(() => (this.scanning = undefined));
+            await this.scanning;
+        }
+        // A scan started before a listener restart may finish after it. Re-evaluate
+        // eligibility against the current listener instead of retaining old annotations.
+        const scan = {
+                items: this.scan!.items.map((row) => annotate(row, this.options.listen)),
+                warning: this.scan!.warning,
+            },
             selection = choose(scan.items, this.preferred);
-        const selected = selection.selected ?? { id: 'loopback', name: '本机专用', ip: '127.0.0.1' };
-        const address = `http://${selected.ip}:${this.port || this.options.port}/`;
+        const selected = selection.selected;
+        const address = selected ? `http://${selected.ip}:${this.port || this.options.port}/` : '';
         return {
             running: !!this.http,
+            share_id: createHash('sha256').update(this.adapter.invite).digest('hex'),
             port: this.port || this.options.port,
             listen: this.options.listen,
             addresses: scan.items,
             selected,
             warning: scan.warning || selection.warning,
             address,
-            link: shareLink(address, this.adapter.invite),
-            localLink: shareLink(address, this.adapter.invite, false),
+            link: address ? shareLink(address, this.adapter.invite) : '',
+            localLink: address ? shareLink(address, this.adapter.invite, false) : '',
             ...this.adapter.snapshot(),
             bridge: this.service.engine.running,
             usb: !!this.service.usbMonitor,
         };
     }
     async call(method: string, args: any[], client: string) {
+        if (method === 'home-state')
+            return {
+                backend: !!this.http,
+                share_id: createHash('sha256').update(this.adapter.invite).digest('hex'),
+                listen: this.options.listen,
+                port: this.port || this.options.port,
+                settings: { ...this.service.settings },
+                device_config_defaults: defaultConfig(this.service.settings.device),
+                revision: this.adapter.revision,
+                snapshot: this.service.poll(this.service.cursor),
+            };
         if (method === 'call') return this.adapter.dispatch(args[0], args[1], args[2], args[3]);
         if (method === 'register') {
+            const scope = args[0] ?? '';
+            assert(typeof scope === 'string' && /^(|home-[a-f0-9]{24})$/.test(scope), '本机页面标识无效');
+            const identity = `native:${client}${scope ? ':' + scope : ''}`;
             for (const [token, c] of this.adapter.clients)
-                if (c.join_id === `native:${client}`) return { token, instance: this.instance };
+                if (c.join_id === identity) return { token, instance: this.instance };
             assert(this.adapter.clients.size < 32, '已连接终端达到上限');
             const token = randomBytes(32).toString('base64url');
             this.adapter.clients.set(token, {
                 id: randomBytes(8).toString('hex'),
-                name: 'VS Code 工作台',
+                name: scope ? 'VS Code 侧栏配置' : 'VS Code 工作台',
                 address: '本机插件',
                 read_epoch: null,
-                join_id: `native:${client}`,
+                join_id: identity,
             });
             return { token, instance: this.instance };
         }
         if (method === 'unregister') {
             for (const [token, c] of this.adapter.clients)
-                if (c.join_id === `native:${client}`) this.adapter.clients.delete(token);
+                if (
+                    args[0]
+                        ? c.join_id === `native:${client}:${args[0]}`
+                        : c.join_id === `native:${client}` || c.join_id?.startsWith(`native:${client}:`)
+                )
+                    this.adapter.clients.delete(token);
             return true;
         }
         // Management and lifecycle writes serialize independently of browser reads.
-        if (method === 'status') return this.status();
+        if (method === 'status') return this.status(args[0] === true);
         let release!: () => void;
         const previous = this.management;
         this.management = new Promise<void>((r) => (release = r));
         await previous;
         try {
             switch (method) {
+                case 'configure': {
+                    const value = args[0];
+                    assert(
+                        object(value) &&
+                            net.isIP(value.listen) === 4 &&
+                            Number.isInteger(value.port) &&
+                            value.port >= 1 &&
+                            value.port <= 65535 &&
+                            Array.isArray(value.origins) &&
+                            value.origins.every((o: any) => typeof o === 'string'),
+                        '服务监听配置无效',
+                    );
+                    this.pendingOptions = {
+                        listen: value.listen,
+                        port: value.port,
+                        origins: [...value.origins],
+                    };
+                    return true;
+                }
                 case 'start':
                     return this.start();
-                case 'stop':
+                case 'stop': {
+                    const registered = await this.call('register', [], client);
+                    for (const [method, args] of [
+                        ['bridge', ['stop']],
+                        ['usb', [false]],
+                    ] as [string, any[]][]) {
+                        const reply = await this.adapter.dispatch(
+                            registered.token,
+                            method,
+                            args,
+                            this.adapter.revision,
+                        );
+                        assert(reply.ok, reply.error || '停止失败');
+                    }
                     await this.http?.close();
                     this.http = undefined;
-                    await this.service.execute('bridge', ['stop']);
                     this.adapter.clients.clear();
                     this.adapter.pending.clear();
                     this.adapter.rotate();
                     return true;
+                }
+                case 'home-config': {
+                    const [scope, operation, values, revision, patch = {}] = args;
+                    assert(
+                        typeof scope === 'string' && /^home-[a-f0-9]{24}$/.test(scope),
+                        '侧栏页面标识无效',
+                    );
+                    assert(
+                        [
+                            'read_device',
+                            'preview_save',
+                            'save_device',
+                            'import_config',
+                            'backup_config',
+                        ].includes(operation),
+                        '未知设备配置操作',
+                    );
+                    assert(revision === this.adapter.revision, '其他终端已更新设置，请核对后重试');
+                    assert(Array.isArray(values), '设备配置参数无效');
+                    const changes = settingsPatch(patch ?? {});
+                    assert(
+                        operation === 'read_device' || !Object.keys(changes).length,
+                        '请先应用连接设置并重新读取',
+                    );
+                    const { token } = await this.call('register', [scope], client);
+                    let nextRevision = revision;
+                    if (Object.keys(changes).length) {
+                        const reply = await this.adapter.dispatch(
+                            token,
+                            'update_settings',
+                            [changes],
+                            nextRevision,
+                        );
+                        assert(reply.ok, reply.error);
+                        nextRevision = reply.revision;
+                    }
+                    const reply = await this.adapter.dispatch(token, operation, values, nextRevision);
+                    return { ...reply, epoch: this.service.epoch };
+                }
+                case 'home-control': {
+                    const [action, patch, revision] = args;
+                    assert(
+                        [
+                            'save-settings',
+                            'bridge-start',
+                            'bridge-stop',
+                            'bridge-restart',
+                            'usb-connect',
+                            'usb-disconnect',
+                        ].includes(action),
+                        '未知首页操作',
+                    );
+                    assert(revision === this.adapter.revision, '其他终端已更新设置，请同步后检查并重试');
+                    const values = settingsPatch(patch ?? {});
+                    const candidate = { ...this.service.settings, ...values };
+                    if (action === 'bridge-start' || action === 'bridge-restart') runtimeSettings(candidate);
+                    if (action === 'bridge-start' || action === 'bridge-restart')
+                        assert(
+                            !this.service.usbMonitor ||
+                                this.service.usbMonitor.port.toLowerCase() !== candidate.com.toLowerCase(),
+                            '业务 COM 正由 USB 诊断占用',
+                        );
+                    if (action === 'usb-connect')
+                        assert(
+                            candidate.device !== 'esp01s' && candidate.usb_port,
+                            '请选择 C5/S3 原生 USB COM',
+                        );
+                    const registered = await this.call('register', [], client);
+                    let nextRevision = revision;
+                    if (Object.keys(values).length) {
+                        const reply = await this.adapter.dispatch(
+                            registered.token,
+                            'update_settings',
+                            [values],
+                            nextRevision,
+                        );
+                        assert(reply.ok, reply.error);
+                        nextRevision = reply.revision;
+                    }
+                    if (action === 'save-settings') return true;
+                    if (['bridge-start', 'bridge-restart', 'usb-connect'].includes(action))
+                        await this.start();
+                    const isBridge = action.startsWith('bridge-');
+                    const operation = isBridge ? action.slice(7) : action === 'usb-connect';
+                    const reply = await this.adapter.dispatch(
+                        registered.token,
+                        isBridge ? 'bridge' : 'usb',
+                        [operation],
+                        nextRevision,
+                    );
+                    assert(reply.ok, reply.error || '操作失败');
+                    return true;
+                }
                 case 'rotate':
                     return this.adapter.rotate();
                 case 'revoke':
@@ -123,9 +297,10 @@ export class BackendOwner {
                 case 'decide':
                     return this.adapter.decide(args[0], args[1]);
                 case 'choose': {
-                    const scan = await addresses(this.options.listen);
-                    const selected = scan.items.find((x) => x.id === args[0] && x.ip === args[1]);
+                    const scan = await this.status(true);
+                    const selected = scan.addresses.find((x) => x.id === args[0] && x.ip === args[1]);
                     assert(selected, '网卡地址已改变，请重新选择');
+                    assert(selected.shareable, selected.reason || '该网卡暂不可用');
                     this.preferred = selected;
                     await atomicJSON(join(this.directory, 'lan.json'), {
                         version: 1,

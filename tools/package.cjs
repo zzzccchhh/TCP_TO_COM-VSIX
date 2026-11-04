@@ -10,7 +10,7 @@ const result = spawnSync(
         '--target',
         'win32-x64',
         '--out',
-        'artifacts/tcp2com-0.1.0-win32-x64.vsix',
+        `artifacts/tcp2com-${require('../package.json').version}-win32-x64.vsix`,
         '--allow-missing-repository',
     ],
     { cwd: path.join(__dirname, '..'), stdio: 'inherit' },

@@ -2,7 +2,7 @@
     "name": "tcp2com",
     "displayName": "TCP2COM · 无线串口工作台",
     "description": "ESP-01S / ESP32-C5 / ESP32-S3 网络串口桥接、USB 配置与局域网多端工作台",
-    "version": "0.1.0",
+    "version": "0.4.2",
     "publisher": "tcp2com-local",
     "private": true,
     "engines": {
@@ -37,7 +37,8 @@
             "tcp2com": [
                 {
                     "id": "tcp2com.controls",
-                    "name": "无线串口工作台"
+                    "name": "无线串口工作台",
+                    "type": "webview"
                 }
             ]
         },
@@ -73,6 +74,14 @@
             {
                 "command": "tcp2com.importState",
                 "title": "TCP2COM: 导入旧版设置"
+            },
+            {
+                "command": "tcp2com.qr",
+                "title": "TCP2COM: 显示连接二维码"
+            },
+            {
+                "command": "tcp2com.listener",
+                "title": "TCP2COM: 更改监听设置"
             }
         ],
         "configuration": {
@@ -111,7 +120,8 @@
         "test:package": "node tools/test-package.cjs",
         "build:native": "node tools/build-native.cjs",
         "package": "npm run build && node tools/package.cjs",
-        "vscode:prepublish": "npm run compile"
+        "vscode:prepublish": "npm run compile",
+        "test:home": "npm run compile && playwright test -c playwright.home.config.cjs"
     },
     "dependencies": {
         "@serialport/bindings-cpp": "13.0.1",

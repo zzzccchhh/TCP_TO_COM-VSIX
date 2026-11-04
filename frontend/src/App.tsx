@@ -306,7 +306,7 @@ export default function App() {
 
     const field = (key: string, label: string, extra: Partial<FieldProps> = {}) => <Field key={key} label={label}
         value={settings[key]} onChange={value => change(key, value)} {...extra} />;
-    const linkOptions: [number, string][] = [[0, 'UART 原始透传'], device === 'c5' ? [4, '四线 SPI 简易写入'] : [1, 'SPI WBR/1']];
+    const linkOptions: [number, string][] = [[0, 'UART 原始透传'], device === 'c5' ? [4, 'SPI传输'] : [1, 'SPI WBR/1']];
     if (device === 'c5') linkOptions.push([3, 'UART GPIO 流控透传']);
     if (device !== 'c5') linkOptions.push([2, 'UART WBR/1']);
     if (device === 'c5' && config.link_mode === -1) linkOptions.unshift([-1, '请选择接口（旧接口已移除）']);
@@ -389,7 +389,7 @@ export default function App() {
                     </fieldset>
                     <div className="connection-actions">
                         {!snap.running ? <LiquidButton className="button primary full" disabled={waiting || !ready} onClick={() => run(() => call('bridge', 'start'))}>{working ? <LoaderCircle size={15} className="spin" /> : <Play size={14} fill="currentColor" />}启动桥接<ArrowRight size={15} /></LiquidButton>
-                            : <div className="form-grid"><LiquidButton className="button primary" disabled={waiting} onClick={() => run(() => call('bridge', 'restart'))}><RefreshCw size={14} />应用并重启</LiquidButton><LiquidButton className="button" disabled={waiting} title="停止业务桥接并关闭 USB" onClick={() => run(() => call('bridge', 'stop'))}><Square size={12} />停止</LiquidButton></div>}
+                            : <div className="form-grid"><LiquidButton className="button primary" disabled={waiting} onClick={() => run(() => call('bridge', 'restart'))}><RefreshCw size={14} />应用并重启</LiquidButton><LiquidButton className="button" disabled={waiting} title="停止业务桥接，保留 USB 连接" onClick={() => run(() => call('bridge', 'stop'))}><Square size={12} />停止</LiquidButton></div>}
                         <p className="connection-note"><ShieldCheck size={12} />{snap.running ? snap.applied ? '当前参数已应用' : '参数有修改，应用并重启后生效' : '手动启动连接 · 不创建虚拟串口'}</p>
                     </div>
                 </GlassSurface>
@@ -486,7 +486,7 @@ export default function App() {
                             {device === 'c5' && cf('flow_pin', '串口流控线（高暂停 / 低允许）', { numeric: true, options: [[0, '未选择'], [1, 'SCK / GPIO23'], [2, 'MOSI / GPIO10'], [3, 'MISO / GPIO9'], [4, 'CS / GPIO5']] })}
                             {cf('baud', '设备 UART 波特率 / bps', { numeric: true })}
                             {device !== 'esp01s' && cf('reset_pin', '外部主控复位线', { numeric: true, options: [[0, '关闭'], [1, `SCK / GPIO${device === 's3' ? 18 : 23}`], [2, 'MOSI / GPIO10'], [3, 'MISO / GPIO9'], [4, 'CS / GPIO5']] })}
-                        </div>{device === 'c5' && config.link_mode === 4 && <p>四线 SPI 仅发送 MCU 数据到网络；TCP 支持连续批量写入，UDP 每包最多 512 字节。UART 波特率、串口流控线和外部复位线在此模式下不启用。</p>}</div>
+                        </div>{device === 'c5' && config.link_mode === 4 && <p>SPI传输仅发送 MCU 数据到网络；TCP 支持连续批量写入，UDP 每包最多 512 字节。UART 波特率、串口流控线和外部复位线在此模式下不启用。</p>}</div>
                         <div className="config-section"><h3>Wi-Fi 与网络</h3><div className="form-grid">
                             {cf('mode', '设备联网模式', { numeric: true, options: [[0, '自建热点 AP'], [1, '连接电脑热点'], [2, '连接共享 Wi-Fi']] })}
                             {cf('band', 'Wi-Fi 频段', { numeric: true, options: device === 's3' ? [[0, '2.4 GHz']] : [[0, '2.4 GHz'], [1, '5 GHz'], [2, '自动（AP 使用 2.4 GHz）']] })}
@@ -529,7 +529,7 @@ export default function App() {
                     <div className="reset-progress">{Array.from({ length: 5 }, (_, i) => <i key={i} className={i < snap.reset.count ? 'filled' : ''} />)}</div>
                     <LiquidButton className="button primary full" disabled={snap.reset.busy} onClick={() => run(() => call('reset_click', resetHost, resetPort))}><Zap size={15} />{snap.reset.busy ? '复位请求进行中…' : `复位外部主控 · ${snap.reset.count}/5`}</LiquidButton><p className="small-copy">{snap.reset.message}</p>
                 </>}
-                {shownDrawer === 'help' && <><div className="help-step"><span>01</span><div><h3>选择设备与连接角色</h3><p>TCP 客户端主动连接设备；TCP 服务端等待设备连接；UDP 使用固定对端。</p></div></div><div className="help-step"><span>02</span><div><h3>设置业务 COM，启动桥接</h3><p>程序打开已有串口。需要虚拟串口时，请先创建串口对。电脑本地波特率不会修改设备 UART。</p></div></div><div className="help-step"><span>03</span><div><h3>按需连接 USB</h3><p>C5/S3 的 USB 用于日志和配置，可独立运行。使用 ESP-IDF monitor 前先断开 USB，等待释放端口。</p></div></div><div className="help-step"><span>04</span><div><h3>读取、编辑、明确保存</h3><p>进入配网后读取当前设备，再编辑并保存。保存会写入 NVS 并重启；保存结果不明时先重新读取核对。</p></div></div><div className="notice"><Info size={16} /><span>关闭主窗口会停止桥接并释放串口。最小化窗口继续转发。停止按钮同时关闭业务桥接与 USB。</span></div></>}
+                {shownDrawer === 'help' && <><div className="help-step"><span>01</span><div><h3>选择设备与连接角色</h3><p>TCP 客户端主动连接设备；TCP 服务端等待设备连接；UDP 使用固定对端。</p></div></div><div className="help-step"><span>02</span><div><h3>设置业务 COM，启动桥接</h3><p>程序打开已有串口。需要虚拟串口时，请先创建串口对。电脑本地波特率不会修改设备 UART。</p></div></div><div className="help-step"><span>03</span><div><h3>按需连接 USB</h3><p>C5/S3 的 USB 用于日志和配置，可独立运行。使用 ESP-IDF monitor 前先断开 USB，等待释放端口。</p></div></div><div className="help-step"><span>04</span><div><h3>读取、编辑、明确保存</h3><p>进入配网后读取当前设备，再编辑并保存。保存会写入 NVS 并重启；保存结果不明时先重新读取核对。</p></div></div><div className="notice"><Info size={16} /><span>关闭工作台页面不会停止桥接。停止按钮只停止业务桥接，USB 可单独断开；停止插件后端或退出承载服务的 VS Code 实例会释放全部连接。</span></div></>}
             </div>
             {shownDrawer === 'config' && <div className="drawer-footer"><span><ShieldCheck size={14} />明确保存后写入设备 NVS</span><LiquidButton className="button primary" disabled={waiting || !snap.baseline || (device === 'c5' && config.link_mode === -1)} onClick={() => run(async () => { const preview = await call<Data>('preview_save', config, passwords, clear); if (!preview.needed) notify('没有修改，无需保存'); else setConfirm({ ...preview, config: structuredClone(config), passwords: { ...passwords }, clear: [...clear] }); })}><Check size={15} />保存并重启</LiquidButton></div>}
         </GlassSurface></div>}

@@ -6,13 +6,30 @@ import { tmpdir } from 'node:os';
 export async function run() {
     const extension = vscode.extensions.getExtension('tcp2com-local.tcp2com');
     assert(extension, 'extension manifest is discoverable');
-    await extension.activate();
-    assert(extension.isActive);
     await vscode.workspace
         .getConfiguration('tcp2com')
-        .update('listen', '127.0.0.1', vscode.ConfigurationTarget.Global);
+        .update('listen', '0.0.0.0', vscode.ConfigurationTarget.Global);
+    await extension.activate();
+    assert(extension.isActive);
     const commands = await vscode.commands.getCommands();
     assert(commands.includes('tcp2com.open'));
+    await vscode.commands.executeCommand('tcp2com.controls.focus');
+    if (process.env.TCP2COM_VISUAL_REPORT) {
+        let verified = false;
+        for (let i = 0; i < 60; i++) {
+            try {
+                const report = JSON.parse(
+                    await require('node:fs/promises').readFile(process.env.TCP2COM_VISUAL_REPORT, 'utf8'),
+                );
+                if (report.homepage && report.configVerified) {
+                    verified = true;
+                    break;
+                }
+            } catch {}
+            await new Promise((r) => setTimeout(r, 1000));
+        }
+        assert(verified, 'homepage controls and complete network inventory');
+    }
     await vscode.commands.executeCommand('tcp2com.open');
     await new Promise((r) => setTimeout(r, 6000));
     if (process.env.TCP2COM_VISUAL_REPORT) {
@@ -22,7 +39,7 @@ export async function run() {
                 const report = JSON.parse(
                     await require('node:fs/promises').readFile(process.env.TCP2COM_VISUAL_REPORT, 'utf8'),
                 );
-                if (report.connected && report.synchronized) {
+                if (report.homepage && report.connected && report.synchronized) {
                     verified = true;
                     break;
                 }

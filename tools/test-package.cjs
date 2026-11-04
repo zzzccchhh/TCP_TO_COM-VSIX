@@ -7,7 +7,11 @@ const root = path.join(__dirname, '..');
 (async () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'tcp2com-package-'));
     try {
-        const vsix = path.join(root, 'artifacts', 'tcp2com-0.1.0-win32-x64.vsix');
+        const vsix = path.join(
+            root,
+            'artifacts',
+            `tcp2com-${require('../package.json').version}-win32-x64.vsix`,
+        );
         const files = [];
         await new Promise((resolve, reject) =>
             yauzl.open(vsix, { lazyEntries: true }, (error, zip) => {

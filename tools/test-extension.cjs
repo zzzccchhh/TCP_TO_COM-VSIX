@@ -6,18 +6,154 @@ fs.mkdirSync(path.join(root, 'artifacts'), { recursive: true });
 const visual = path.join(root, 'artifacts', 'extension-visual.json');
 if (fs.existsSync(visual)) fs.unlinkSync(visual);
 let finished = false;
+let homepage = false;
+let inlineQR = false;
+let configVerified = false;
 (async () => {
     const { chromium } = require('@playwright/test');
+    const { defaultConfig } = require('../dist/src/shared/model');
+    let configPosts = 0;
+    const fixture = require('node:http').createServer((req, res) => {
+        if (req.method === 'GET')
+            res.end(
+                JSON.stringify({
+                    ...defaultConfig('c5'),
+                    config_api: 'c5-config-2',
+                    revision: 5,
+                    http_session: '0123456789abcdef-1',
+                }),
+            );
+        else {
+            let text = '';
+            req.on('data', (chunk) => (text += chunk));
+            req.on('end', () => {
+                const patch = JSON.parse(text);
+                if (
+                    patch.baud !== 2000000 ||
+                    patch.revision !== 5 ||
+                    req.headers['x-c5-session'] !== '0123456789abcdef-1'
+                ) {
+                    res.writeHead(400);
+                    res.end('{}');
+                    return;
+                }
+                configPosts++;
+                res.end('{"saved":true,"restart":true}');
+            });
+        }
+    });
+    await new Promise((resolve) => fixture.listen(0, '127.0.0.1', resolve));
+    const configURL = `http://127.0.0.1:${fixture.address().port}/`;
     let browser;
+    let interacting = false;
     try {
         for (let i = 0; i < 60 && !finished; i++) {
             try {
                 browser = await chromium.connectOverCDP('http://127.0.0.1:9333');
                 const pages = browser.contexts().flatMap((c) => c.pages());
+                if (!homepage) {
+                    const { expect } = require('@playwright/test');
+                    let home, homePage;
+                    for (const p of pages)
+                        for (const f of p.frames())
+                            if (await f.locator('.home-shell').count()) {
+                                home = f;
+                                homePage = p;
+                            }
+                    if (home) {
+                        interacting = true;
+                        await expect(home.getByRole('status', { name: '后端状态', exact: true })).toHaveText(
+                            '已停止',
+                        );
+                        await home.getByRole('button', { name: '开启后端', exact: true }).click();
+                        await expect(home.getByRole('status', { name: '后端状态', exact: true })).toHaveText(
+                            '运行中',
+                        );
+                        await expect(
+                            home.getByRole('button', { name: '开启后端', exact: true }),
+                        ).toBeDisabled();
+                        await home.getByLabel('业务 COM', { exact: true }).fill('');
+                        await home.getByRole('button', { name: '开启桥接', exact: true }).click();
+                        await expect(home.locator('#notice')).toContainText('请选择业务 COM');
+                        await expect(home.getByRole('status', { name: '桥接状态', exact: true })).toHaveText(
+                            '已停止',
+                        );
+                        await home.getByRole('button', { name: '放弃编辑并同步', exact: true }).click();
+                        await home.getByRole('button', { name: '刷新网卡', exact: true }).click();
+                        await expect(home.locator('#notice')).toHaveText('操作已完成');
+                        await expect(home.locator('#adapter-count')).toContainText('条');
+                        await expect(home.locator('#adapter-list li')).not.toHaveCount(0);
+                        await expect(home.locator('header,h1,.eyebrow')).toHaveCount(0);
+                        const options = await home
+                            .locator('#adapter-select')
+                            .evaluate((e) =>
+                                [...e.options]
+                                    .filter((o) => !o.disabled)
+                                    .map((o) => ({ value: o.value, ip: o.dataset.ip })),
+                            );
+                        const picker = home.getByRole('combobox', { name: '分享网卡', exact: true });
+                        await picker.click();
+                        await expect(home.getByRole('option')).toHaveCount(options.length);
+                        await picker.press('Escape');
+                        const external = options.find((o) => o.ip && !o.ip.startsWith('127.'));
+                        if (external) {
+                            await picker.click();
+                            await home
+                                .locator(`.picker-popup:not([hidden]) [data-value="${external.value}"]`)
+                                .click();
+                            await expect(home.locator('#share-qrcode')).toBeVisible();
+                            await expect(home.locator('#share-qrcode')).toHaveJSProperty('naturalWidth', 208);
+                            inlineQR = true;
+                            await homePage.screenshot({
+                                path: path.join(root, 'artifacts', 'vscode-home-share.png'),
+                            });
+                        }
+                        const local = options.find((o) => o.ip === '127.0.0.1');
+                        if (local) {
+                            await picker.click();
+                            await home
+                                .locator(`.picker-popup:not([hidden]) [data-value="${local.value}"]`)
+                                .click();
+                            await expect(home.locator('#share-qrcode')).toBeHidden();
+                            await expect(home.locator('#qr-message')).toContainText('本机');
+                        }
+                        const transport = home.getByRole('combobox', { name: '配置连接', exact: true });
+                        await transport.click();
+                        await home.locator('.picker-popup:not([hidden]) [data-value="http"]').click();
+                        await home.getByLabel('设备配置地址', { exact: true }).fill(configURL);
+                        await home.locator('#config-read').click();
+                        await expect(home.locator('#config-status')).toContainText('已在本页读取');
+                        await home.locator('#cfg-baud').fill('2000000');
+                        await home.locator('#config-preview').click();
+                        await expect(home.locator('#config-changes')).toContainText('2000000');
+                        await home.locator('#config-confirm').click();
+                        await expect(home.locator('#notice')).toContainText('设备已确认保存');
+                        await expect(home.locator('#config-preview')).toBeDisabled();
+                        if (configPosts !== 1)
+                            throw Error('Sidebar save did not reach mock firmware exactly once');
+                        configVerified = true;
+                        await home.getByRole('tab', { name: 'AP 热点', exact: true }).click();
+                        await home.locator('#device-config').scrollIntoViewIfNeeded();
+                        await homePage.screenshot({
+                            path: path.join(root, 'artifacts', 'vscode-home-config.png'),
+                        });
+                        await home.getByRole('button', { name: '停止后端', exact: true }).click();
+                        await expect(home.getByRole('status', { name: '后端状态', exact: true })).toHaveText(
+                            '已停止',
+                        );
+                        await expect(home.locator('#share-qrcode')).toBeHidden();
+                        await home
+                            .getByRole('button', { name: '开启后端', exact: true })
+                            .scrollIntoViewIfNeeded();
+                        await homePage.screenshot({ path: path.join(root, 'artifacts', 'vscode-home.png') });
+                        homepage = true;
+                        fs.writeFileSync(visual, JSON.stringify({ homepage: true, configVerified }, null, 2));
+                    }
+                }
                 let frame, page;
                 for (const p of pages) {
                     for (const f of p.frames()) {
-                        if (await f.getByLabel('业务 COM', { exact: true }).count()) {
+                        if (await f.locator('.app-shell').count()) {
                             frame = f;
                             page = p;
                             break;
@@ -84,7 +220,14 @@ let finished = false;
                 }
                 if (!synchronized) throw Error('Webview edit did not reach shared backend');
                 await page.screenshot({ path: path.join(root, 'artifacts', 'vscode-workbench.png') });
-                fs.writeFileSync(visual, JSON.stringify({ connected: true, synchronized: true }, null, 2));
+                fs.writeFileSync(
+                    visual,
+                    JSON.stringify(
+                        { homepage, inlineQR, configVerified, connected: true, synchronized: true },
+                        null,
+                        2,
+                    ),
+                );
                 await browser.close();
                 return;
             } catch (e) {
@@ -92,16 +235,20 @@ let finished = false;
                     await browser.close().catch(() => {});
                     browser = undefined;
                 }
-                if (i === 59) throw e;
+                if (interacting || i === 59) throw e;
                 await new Promise((r) => setTimeout(r, 800));
             }
         }
     } catch (e) {
         console.error('Webview verification:', e.message);
+    } finally {
+        await new Promise((resolve) => fixture.close(resolve));
     }
 })();
 runTests({
-    vscodeExecutablePath: path.join(process.env.LOCALAPPDATA, 'Programs', 'Microsoft VS Code', 'Code.exe'),
+    vscodeExecutablePath:
+        process.env.TCP2COM_VSCODE_EXECUTABLE ||
+        path.join(process.env.LOCALAPPDATA, 'Programs', 'Microsoft VS Code', 'Code.exe'),
     extensionDevelopmentPath: process.env.TCP2COM_EXTENSION_ROOT || root,
     extensionTestsPath: path.join(root, 'dist', 'tests', 'extension', 'index.js'),
     launchArgs: [

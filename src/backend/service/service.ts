@@ -40,8 +40,11 @@ export class Service {
     private persist = Promise.resolve();
     private sample = { time: Date.now(), bytes: [0, 0, 0] };
     private rates = [0, 0, 0];
-    constructor(readonly store: Store) {
-        this.engine = new BridgeEngine((s) => this.log(s));
+    constructor(
+        readonly store: Store,
+        private createBridge = (log: (text: string) => void) => new BridgeEngine(log),
+    ) {
+        this.engine = this.createBridge((s) => this.log(s));
     }
     async init() {
         const saved = await this.store.load();
@@ -135,21 +138,20 @@ export class Service {
             case 'bridge': {
                 assert(!this.configBusy && !this.busy, '连接或配置操作进行中');
                 assert(['start', 'restart', 'stop'].includes(args[0]), '未知桥接操作');
+                if (args[0] !== 'stop') {
+                    runtimeSettings(this.settings);
+                    assert(
+                        !this.usbMonitor ||
+                            this.usbMonitor.port.toLowerCase() !== this.settings.com.toLowerCase(),
+                        '业务 COM 正由 USB 诊断占用',
+                    );
+                }
                 this.busy = true;
                 try {
                     await this.engine.stop();
-                    if (args[0] === 'stop') {
-                        await this.usbMonitor?.close();
-                        this.usbMonitor = undefined;
-                        this.currentUSB();
-                    } else {
-                        assert(
-                            !this.usbMonitor ||
-                                this.usbMonitor.port.toLowerCase() !== this.settings.com.toLowerCase(),
-                            '业务 COM 正由 USB 诊断占用',
-                        );
+                    if (args[0] !== 'stop') {
                         // A fresh engine prevents callbacks from the old instance affecting a restart.
-                        this.engine = new BridgeEngine((s) => this.log(s));
+                        this.engine = this.createBridge((s) => this.log(s));
                         await this.engine.start({ ...this.settings });
                         this.sample = { time: Date.now(), bytes: [0, 0, 0] };
                     }
