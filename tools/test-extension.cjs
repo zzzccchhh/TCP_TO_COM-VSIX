@@ -2,6 +2,18 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { runTests } = require('@vscode/test-electron');
 const root = path.join(__dirname, '..');
+// Keep the user's service on the default port running during isolated host checks.
+const backendPort = Number(
+    require('node:child_process').execFileSync(
+        process.execPath,
+        [
+            '-e',
+            "const server=require('node:net').createServer();server.listen(0,'127.0.0.1',()=>{console.log(server.address().port);server.close()})",
+        ],
+        { encoding: 'utf8', windowsHide: true },
+    ),
+);
+const serviceURL = `http://127.0.0.1:${backendPort}`;
 fs.mkdirSync(path.join(root, 'artifacts'), { recursive: true });
 const visual = path.join(root, 'artifacts', 'extension-visual.json');
 if (fs.existsSync(visual)) fs.unlinkSync(visual);
@@ -9,6 +21,7 @@ let finished = false;
 let homepage = false;
 let inlineQR = false;
 let configVerified = false;
+let panelsVerified = false;
 (async () => {
     const { chromium } = require('@playwright/test');
     const { defaultConfig } = require('../dist/src/shared/model');
@@ -62,6 +75,10 @@ let configVerified = false;
                             }
                     if (home) {
                         interacting = true;
+                        await expect(home.locator('[data-panel-toggle]')).toHaveCount(6);
+                        for (const toggle of await home.locator('[data-panel-toggle]').all())
+                            if ((await toggle.getAttribute('aria-expanded')) === 'false')
+                                await toggle.click();
                         await expect(home.getByRole('status', { name: '后端状态', exact: true })).toHaveText(
                             '已停止',
                         );
@@ -72,6 +89,12 @@ let configVerified = false;
                         await expect(
                             home.getByRole('button', { name: '开启后端', exact: true }),
                         ).toBeDisabled();
+                        const backendPanel = home.getByRole('button', { name: '后端服务', exact: true });
+                        await backendPanel.click();
+                        await expect(home.locator('#backend-start')).toBeHidden();
+                        await expect(home.locator('#backend-state')).toHaveText('运行中');
+                        await backendPanel.press('Enter');
+                        await expect(home.locator('#backend-start')).toBeVisible();
                         await home.getByLabel('业务 COM', { exact: true }).fill('');
                         await home.getByRole('button', { name: '开启桥接', exact: true }).click();
                         await expect(home.locator('#notice')).toContainText('请选择业务 COM');
@@ -146,8 +169,21 @@ let configVerified = false;
                             .getByRole('button', { name: '开启后端', exact: true })
                             .scrollIntoViewIfNeeded();
                         await homePage.screenshot({ path: path.join(root, 'artifacts', 'vscode-home.png') });
+                        for (const toggle of await home.locator('[data-panel-toggle]').all())
+                            await toggle.click();
+                        await expect(home.locator('.panel-body:not([hidden])')).toHaveCount(0);
+                        await expect(home.locator('#save-settings')).toBeVisible();
+                        await homePage.screenshot({
+                            path: path.join(root, 'artifacts', 'vscode-home-panels.png'),
+                        });
+                        for (const toggle of await home.locator('[data-panel-toggle]').all())
+                            await toggle.click();
+                        panelsVerified = true;
                         homepage = true;
-                        fs.writeFileSync(visual, JSON.stringify({ homepage: true, configVerified }, null, 2));
+                        fs.writeFileSync(
+                            visual,
+                            JSON.stringify({ homepage: true, configVerified, panelsVerified }, null, 2),
+                        );
                     }
                 }
                 let frame, page;
@@ -186,12 +222,12 @@ let configVerified = false;
                 await expect(frame.getByRole('button', { name: '启动桥接', exact: true })).toBeVisible();
                 await frame.getByLabel('业务 COM', { exact: true }).click();
                 await frame.getByLabel('业务 COM', { exact: true }).fill('COM-EXTENSION-TEST');
-                const res = await fetch('http://127.0.0.1:8765/');
+                const res = await fetch(serviceURL + '/');
                 const html = await res.text();
                 const invite = JSON.parse(html.match(/window\.__WIFI_BRIDGE__=(\{[^<]+\});/)[1]).invite;
                 const post = async (p, body, token) =>
                     await (
-                        await fetch('http://127.0.0.1:8765' + p, {
+                        await fetch(serviceURL + p, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -223,7 +259,14 @@ let configVerified = false;
                 fs.writeFileSync(
                     visual,
                     JSON.stringify(
-                        { homepage, inlineQR, configVerified, connected: true, synchronized: true },
+                        {
+                            homepage,
+                            inlineQR,
+                            configVerified,
+                            panelsVerified,
+                            connected: true,
+                            synchronized: true,
+                        },
                         null,
                         2,
                     ),
@@ -262,6 +305,7 @@ runTests({
         '--remote-debugging-port=9333',
     ],
     extensionTestsEnv: {
+        TCP2COM_TEST_PORT: String(backendPort),
         TCP2COM_TEST_REPORT: path.join(root, 'artifacts', 'extension-test.json'),
         TCP2COM_VISUAL_REPORT: visual,
     },

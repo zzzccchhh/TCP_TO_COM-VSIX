@@ -192,6 +192,44 @@ h2 {
     margin: 0;
     font-weight: 600;
 }
+.section-title h2 {
+    flex: 1;
+    min-width: 0;
+}
+button.panel-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 3px 2px;
+    border-radius: 2px;
+    background: transparent;
+    color: var(--vscode-foreground);
+    text-align: left;
+    font-weight: inherit;
+}
+button.panel-toggle:hover {
+    background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+.panel-chevron {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    margin: 0 3px 3px;
+    border-right: 1.4px solid currentColor;
+    border-bottom: 1.4px solid currentColor;
+    transform: rotate(45deg);
+}
+[aria-expanded='false'] > .panel-chevron {
+    margin-bottom: 0;
+    transform: rotate(-45deg);
+}
+[data-collapsed='true'] > .section-title {
+    margin-bottom: 0;
+}
+.panel-tools {
+    margin-bottom: 10px;
+}
 .badge {
     font-size: 11px;
     color: var(--vscode-descriptionForeground);

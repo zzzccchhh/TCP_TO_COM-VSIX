@@ -11,113 +11,151 @@
     </head>
     <body>
         <main class="home-shell">
-            <section aria-label="后端服务">
+            <section aria-label="后端服务" data-panel="backend">
                 <div class="section-title">
-                    <h2>后端服务</h2>
+                    <h2>
+                        <button
+                            type="button"
+                            class="panel-toggle"
+                            data-panel-toggle="backend"
+                            aria-expanded="true"
+                            aria-controls="panel-body-backend"
+                        >
+                            <span class="panel-chevron" aria-hidden="true"></span><span>后端服务</span>
+                        </button>
+                    </h2>
                     <span id="backend-state" class="badge" role="status" aria-label="后端状态">读取中</span>
                 </div>
-                <div class="actions">
-                    <button type="button" data-action="backend-start" id="backend-start">开启后端</button
-                    ><button type="button" class="secondary" data-action="backend-stop" id="backend-stop">
-                        停止后端
-                    </button>
+                <div class="panel-body" id="panel-body-backend">
+                    <div class="actions">
+                        <button type="button" data-action="backend-start" id="backend-start">开启后端</button
+                        ><button type="button" class="secondary" data-action="backend-stop" id="backend-stop">
+                            停止后端
+                        </button>
+                    </div>
+                    <dl>
+                        <dt>监听地址</dt>
+                        <dd id="listen-address">—</dd>
+                    </dl>
+                    <button type="button" class="link" data-action="listener">更改监听设置</button>
+                    <p class="hint">停止后端会同时释放桥接与 USB。</p>
                 </div>
-                <dl>
-                    <dt>监听地址</dt>
-                    <dd id="listen-address">—</dd>
-                </dl>
-                <button type="button" class="link" data-action="listener">更改监听设置</button>
-                <p class="hint">停止后端会同时释放桥接与 USB。</p>
             </section>
-            <section aria-label="业务桥接">
+            <section aria-label="业务桥接" data-panel="bridge">
                 <div class="section-title">
-                    <h2>业务桥接</h2>
+                    <h2>
+                        <button
+                            type="button"
+                            class="panel-toggle"
+                            data-panel-toggle="bridge"
+                            aria-expanded="true"
+                            aria-controls="panel-body-bridge"
+                        >
+                            <span class="panel-chevron" aria-hidden="true"></span><span>业务桥接</span>
+                        </button>
+                    </h2>
                     <span id="bridge-state" class="badge" role="status" aria-label="桥接状态">读取中</span>
                 </div>
-                <div class="actions">
-                    <button type="button" id="bridge-start" data-control="bridge-start">开启桥接</button
-                    ><button type="button" id="bridge-stop" class="secondary" data-control="bridge-stop">
-                        停止桥接</button
-                    ><button
-                        type="button"
-                        id="bridge-restart"
-                        class="secondary"
-                        data-control="bridge-restart"
-                    >
-                        重启桥接
-                    </button>
-                </div>
-                <div class="fields">
-                    <label
-                        >设备<select data-setting="device">
-                            <option value="c5">ESP32-C5</option>
-                            <option value="s3">ESP32-S3</option>
-                            <option value="esp01s">ESP-01S</option>
-                        </select></label
-                    >
-                    <div class="two">
-                        <label
-                            >业务 COM<input
-                                data-setting="com"
-                                list="ports"
-                                placeholder="例如 COM5"
-                                spellcheck="false" /></label
-                        ><label>波特率<input data-setting="baud" inputmode="numeric" list="bauds" /></label>
+                <div class="panel-body" id="panel-body-bridge">
+                    <div class="actions">
+                        <button type="button" id="bridge-start" data-control="bridge-start">开启桥接</button
+                        ><button type="button" id="bridge-stop" class="secondary" data-control="bridge-stop">
+                            停止桥接</button
+                        ><button
+                            type="button"
+                            id="bridge-restart"
+                            class="secondary"
+                            data-control="bridge-restart"
+                        >
+                            重启桥接
+                        </button>
                     </div>
-                    <label
-                        >电脑网络角色<select data-setting="mode">
-                            <option value="tcp-server">TCP 服务端</option>
-                            <option value="tcp-client">TCP 客户端</option>
-                            <option value="udp">固定对端 UDP</option>
-                        </select></label
-                    >
-                    <label id="host-field"
-                        >对端地址<input
-                            data-setting="host"
-                            placeholder="设备 IP；服务端可留空"
-                            spellcheck="false"
-                    /></label>
-                    <div class="two">
-                        <label>本地监听<input data-setting="listen" spellcheck="false" /></label
-                        ><label id="port-label"
-                            >业务端口<input data-setting="port" inputmode="numeric"
+                    <div class="fields">
+                        <label
+                            >设备<select data-setting="device">
+                                <option value="c5">ESP32-C5</option>
+                                <option value="s3">ESP32-S3</option>
+                                <option value="esp01s">ESP-01S</option>
+                            </select></label
+                        >
+                        <div class="two">
+                            <label
+                                >业务 COM<input
+                                    data-setting="com"
+                                    list="ports"
+                                    placeholder="例如 COM5"
+                                    spellcheck="false" /></label
+                            ><label
+                                >波特率<input data-setting="baud" inputmode="numeric" list="bauds"
+                            /></label>
+                        </div>
+                        <label
+                            >电脑网络角色<select data-setting="mode">
+                                <option value="tcp-server">TCP 服务端</option>
+                                <option value="tcp-client">TCP 客户端</option>
+                                <option value="udp">固定对端 UDP</option>
+                            </select></label
+                        >
+                        <label id="host-field"
+                            >对端地址<input
+                                data-setting="host"
+                                placeholder="设备 IP；服务端可留空"
+                                spellcheck="false"
+                        /></label>
+                        <div class="two">
+                            <label>本地监听<input data-setting="listen" spellcheck="false" /></label
+                            ><label id="port-label"
+                                >业务端口<input data-setting="port" inputmode="numeric"
+                            /></label>
+                        </div>
+                        <label id="peer-field"
+                            >UDP 对端端口<input data-setting="peer_port" inputmode="numeric"
                         /></label>
                     </div>
-                    <label id="peer-field"
-                        >UDP 对端端口<input data-setting="peer_port" inputmode="numeric"
-                    /></label>
-                </div>
 
-                <p id="bridge-address" class="hint">业务桥接已停止</p>
+                    <p id="bridge-address" class="hint">业务桥接已停止</p>
+                </div>
             </section>
-            <section aria-label="USB 日志与配置" id="usb-settings">
+            <section aria-label="USB 日志与配置" id="usb-settings" data-panel="usb">
                 <div class="section-title">
-                    <h2>USB 日志与配置</h2>
+                    <h2>
+                        <button
+                            type="button"
+                            class="panel-toggle"
+                            data-panel-toggle="usb"
+                            aria-expanded="true"
+                            aria-controls="panel-body-usb"
+                        >
+                            <span class="panel-chevron" aria-hidden="true"></span><span>USB 日志与配置</span>
+                        </button>
+                    </h2>
                     <span id="usb-state" class="badge" role="status" aria-label="USB 状态">未连接</span>
                 </div>
-                <div class="two">
-                    <label
-                        >USB COM<input
-                            data-setting="usb_port"
-                            list="ports"
-                            placeholder="原生 USB COM"
-                            spellcheck="false" /></label
-                    ><label
-                        >USB 波特率<input data-setting="usb_baud" inputmode="numeric" list="bauds"
-                    /></label>
-                </div>
-                <div class="actions">
-                    <button type="button" data-control="usb-connect" id="usb-connect">连接 USB</button
-                    ><button
-                        type="button"
-                        class="secondary"
-                        data-control="usb-disconnect"
-                        id="usb-disconnect"
-                    >
-                        断开 USB</button
-                    ><button type="button" class="secondary" data-action="ports" id="ports-refresh">
-                        刷新串口
-                    </button>
+                <div class="panel-body" id="panel-body-usb">
+                    <div class="two">
+                        <label
+                            >USB COM<input
+                                data-setting="usb_port"
+                                list="ports"
+                                placeholder="原生 USB COM"
+                                spellcheck="false" /></label
+                        ><label
+                            >USB 波特率<input data-setting="usb_baud" inputmode="numeric" list="bauds"
+                        /></label>
+                    </div>
+                    <div class="actions">
+                        <button type="button" data-control="usb-connect" id="usb-connect">连接 USB</button
+                        ><button
+                            type="button"
+                            class="secondary"
+                            data-control="usb-disconnect"
+                            id="usb-disconnect"
+                        >
+                            断开 USB</button
+                        ><button type="button" class="secondary" data-action="ports" id="ports-refresh">
+                            刷新串口
+                        </button>
+                    </div>
                 </div>
             </section>
             <div class="edit-actions">
@@ -127,97 +165,140 @@
                     放弃编辑并同步</button
                 ><span id="dirty-state" class="hint"></span>
             </div>
-            <section aria-label="设备配置" id="device-config">
+            <section aria-label="设备配置" id="device-config" data-panel="config">
                 <div class="section-title">
-                    <h2>设备配置</h2>
+                    <h2>
+                        <button
+                            type="button"
+                            class="panel-toggle"
+                            data-panel-toggle="config"
+                            aria-expanded="true"
+                            aria-controls="panel-body-config"
+                        >
+                            <span class="panel-chevron" aria-hidden="true"></span><span>设备配置</span>
+                        </button>
+                    </h2>
                     <span id="config-device" class="badge"></span>
                 </div>
-                <label
-                    >配置连接<select data-setting="config_transport">
-                        <option value="usb">原生 USB</option>
-                        <option value="http">HTTP 配网</option>
-                    </select></label
-                >
-                <div id="config-http">
+                <div class="panel-body" id="panel-body-config">
                     <label
-                        >设备配置地址<input
-                            data-setting="config_url"
-                            placeholder="http://192.168.4.1/"
-                            spellcheck="false"
-                    /></label>
-                </div>
-                <div id="config-usb">
-                    <p id="config-usb-status" class="hint"></p>
-                    <div class="actions">
-                        <button type="button" class="secondary" id="config-usb-connect">连接 USB</button>
-                        <button type="button" class="secondary" id="config-usb-disconnect">断开 USB</button>
-                        <button type="button" class="link" id="config-usb-settings">选择 USB 串口</button>
+                        >配置连接<select data-setting="config_transport">
+                            <option value="usb">原生 USB</option>
+                            <option value="http">HTTP 配网</option>
+                        </select></label
+                    >
+                    <div id="config-http">
+                        <label
+                            >设备配置地址<input
+                                data-setting="config_url"
+                                placeholder="http://192.168.4.1/"
+                                spellcheck="false"
+                        /></label>
                     </div>
-                </div>
-                <p id="config-status" class="hint" role="status" aria-live="polite">请先读取设备配置</p>
-                <div class="actions" id="config-read-actions">
-                    <button type="button" id="config-read">读取设备</button>
-                </div>
-                <div id="config-editor">
-                    <div class="actions config-tabs" role="tablist" aria-label="设备配置分组">
-                        <button type="button" role="tab" data-group="common">接口与网络</button>
-                        <button type="button" role="tab" data-group="ap">AP 热点</button>
-                        <button type="button" role="tab" data-group="pc">电脑 STA</button>
-                        <button type="button" role="tab" data-group="shared">共享 STA</button>
-                    </div>
-                    <div id="config-groups"></div>
-                    <p class="hint">密码留空保留原值；备份不含密码。保存会写入设备并请求重启。</p>
-                    <div class="actions">
-                        <button type="button" class="secondary" id="config-undo">撤销修改</button>
-                        <button type="button" class="secondary" id="config-restore">恢复本页草稿</button>
-                        <button type="button" class="secondary" id="config-import">导入备份</button>
-                        <button type="button" class="secondary" id="config-export">导出备份</button>
-                        <button type="button" id="config-preview">保存到设备并重启</button>
-                    </div>
-                    <div id="config-confirmation" hidden>
-                        <p>确认以下修改并重启设备：</p>
-                        <ul id="config-changes"></ul>
+                    <div id="config-usb">
+                        <p id="config-usb-status" class="hint"></p>
                         <div class="actions">
-                            <button type="button" id="config-confirm">确认保存并重启</button
-                            ><button type="button" class="secondary" id="config-cancel">取消保存</button>
+                            <button type="button" class="secondary" id="config-usb-connect">连接 USB</button>
+                            <button type="button" class="secondary" id="config-usb-disconnect">
+                                断开 USB
+                            </button>
+                            <button type="button" class="link" id="config-usb-settings">选择 USB 串口</button>
+                        </div>
+                    </div>
+                    <p id="config-status" class="hint" role="status" aria-live="polite">请先读取设备配置</p>
+                    <div class="actions" id="config-read-actions">
+                        <button type="button" id="config-read">读取设备</button>
+                    </div>
+                    <div id="config-editor">
+                        <div class="actions config-tabs" role="tablist" aria-label="设备配置分组">
+                            <button type="button" role="tab" data-group="common">接口与网络</button>
+                            <button type="button" role="tab" data-group="ap">AP 热点</button>
+                            <button type="button" role="tab" data-group="pc">电脑 STA</button>
+                            <button type="button" role="tab" data-group="shared">共享 STA</button>
+                        </div>
+                        <div id="config-groups"></div>
+                        <p class="hint">密码留空保留原值；备份不含密码。保存会写入设备并请求重启。</p>
+                        <div class="actions">
+                            <button type="button" class="secondary" id="config-undo">撤销修改</button>
+                            <button type="button" class="secondary" id="config-restore">恢复本页草稿</button>
+                            <button type="button" class="secondary" id="config-import">导入备份</button>
+                            <button type="button" class="secondary" id="config-export">导出备份</button>
+                            <button type="button" id="config-preview">保存到设备并重启</button>
+                        </div>
+                        <div id="config-confirmation" hidden>
+                            <p>确认以下修改并重启设备：</p>
+                            <ul id="config-changes"></ul>
+                            <div class="actions">
+                                <button type="button" id="config-confirm">确认保存并重启</button
+                                ><button type="button" class="secondary" id="config-cancel">取消保存</button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </section>
-            <section aria-label="网卡与分享">
+            <section aria-label="网卡与分享" data-panel="network">
                 <div class="section-title">
-                    <h2>网卡与分享</h2>
-                    <button type="button" class="link" data-action="network" id="network-refresh">
-                        刷新网卡
-                    </button>
+                    <h2>
+                        <button
+                            type="button"
+                            class="panel-toggle"
+                            data-panel-toggle="network"
+                            aria-expanded="true"
+                            aria-controls="panel-body-network"
+                        >
+                            <span class="panel-chevron" aria-hidden="true"></span><span>网卡与分享</span>
+                        </button>
+                    </h2>
                 </div>
-                <label
-                    >分享网卡<select id="adapter-select" aria-label="分享网卡">
-                        <option>正在读取网卡…</option>
-                    </select></label
-                >
-                <p id="network-warning" class="hint" role="status" aria-label="网卡状态"></p>
-                <p id="share-address" class="address"></p>
-                <div class="share-qr" aria-label="手机扫码连接">
-                    <img id="share-qrcode" alt="手机连接二维码" width="208" height="208" hidden />
-                    <p id="qr-message" class="hint" role="status">开启后端后自动显示连接二维码</p>
+                <div class="panel-body" id="panel-body-network">
+                    <div class="panel-tools">
+                        <button type="button" class="link" data-action="network" id="network-refresh">
+                            刷新网卡
+                        </button>
+                    </div>
+                    <label
+                        >分享网卡<select id="adapter-select" aria-label="分享网卡">
+                            <option>正在读取网卡…</option>
+                        </select></label
+                    >
+                    <p id="network-warning" class="hint" role="status" aria-label="网卡状态"></p>
+                    <p id="share-address" class="address"></p>
+                    <div class="share-qr" aria-label="手机扫码连接">
+                        <img id="share-qrcode" alt="手机连接二维码" width="208" height="208" hidden />
+                        <p id="qr-message" class="hint" role="status">开启后端后自动显示连接二维码</p>
+                    </div>
+                    <details>
+                        <summary id="adapter-count">全部网卡与地址</summary>
+                        <ul id="adapter-list"></ul>
+                    </details>
+                    <div class="actions">
+                        <button type="button" class="secondary" data-action="share" id="share">
+                            复制在线链接
+                        </button>
+                    </div>
+                    <p class="hint">分享网卡决定链接地址，不改变后端监听范围。</p>
                 </div>
-                <details>
-                    <summary id="adapter-count">全部网卡与地址</summary>
-                    <ul id="adapter-list"></ul>
-                </details>
-                <div class="actions">
-                    <button type="button" class="secondary" data-action="share" id="share">
-                        复制在线链接
-                    </button>
-                </div>
-                <p class="hint">分享网卡决定链接地址，不改变后端监听范围。</p>
             </section>
-            <section class="shortcuts">
-                <button type="button" data-action="workspace">打开完整工作台</button>
-                <div class="actions">
-                    <button type="button" class="secondary" data-action="logs">查看日志</button
-                    ><button type="button" class="secondary" data-action="manage">终端管理</button>
+            <section aria-label="快捷入口" class="shortcuts" data-panel="shortcuts">
+                <div class="section-title">
+                    <h2>
+                        <button
+                            type="button"
+                            class="panel-toggle"
+                            data-panel-toggle="shortcuts"
+                            aria-expanded="true"
+                            aria-controls="panel-body-shortcuts"
+                        >
+                            <span class="panel-chevron" aria-hidden="true"></span><span>快捷入口</span>
+                        </button>
+                    </h2>
+                </div>
+                <div class="panel-body" id="panel-body-shortcuts">
+                    <button type="button" data-action="workspace">打开完整工作台</button>
+                    <div class="actions">
+                        <button type="button" class="secondary" data-action="logs">查看日志</button
+                        ><button type="button" class="secondary" data-action="manage">终端管理</button>
+                    </div>
                 </div>
             </section>
             <p id="notice" role="status" aria-live="polite"></p>

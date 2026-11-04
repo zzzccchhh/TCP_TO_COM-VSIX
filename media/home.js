@@ -10,16 +10,51 @@
         qrPending = false;
     const dirty = new Set(),
         pending = new Map();
+    const savedState = vscode.getState?.() || {};
+    function saveState(patch) {
+        Object.assign(savedState, patch);
+        vscode.setState?.(savedState);
+    }
+    const panels = initPanels();
     const config = window.createHomeConfig({
         request,
         notice,
         vscode,
+        savedState,
+        saveState,
+        expandPanel: panels.expand,
         current: () => state,
         settings: () => Object.fromEntries(fields.map((f) => [f.dataset.setting, f.value])),
         patch,
         revision: () => (dirty.size ? baseRevision : state?.revision),
         locked: () => busy || state?.snapshot.busy || state?.snapshot.config_busy,
     });
+    function initPanels() {
+        const entries = new Map();
+        const collapsed = {};
+        function set(key, value, persist = true) {
+            const panel = entries.get(key);
+            if (!panel) return;
+            if (value) {
+                window.HomePickers.close();
+                if (panel.body.contains(document.activeElement)) panel.toggle.focus();
+            }
+            panel.body.hidden = value;
+            panel.section.dataset.collapsed = String(value);
+            panel.toggle.setAttribute('aria-expanded', String(!value));
+            collapsed[key] = value;
+            if (persist) saveState({ collapsedPanels: { ...collapsed } });
+        }
+        for (const section of document.querySelectorAll('[data-panel]')) {
+            const key = section.dataset.panel;
+            const toggle = section.querySelector('[data-panel-toggle]');
+            const body = document.getElementById(toggle.getAttribute('aria-controls'));
+            entries.set(key, { section, toggle, body });
+            set(key, savedState.collapsedPanels?.[key] === true, false);
+            toggle.addEventListener('click', () => set(key, !body.hidden));
+        }
+        return { expand: (key) => set(key, false) };
+    }
     function notice(text, error = false) {
         $('notice').textContent = text;
         $('notice').classList.toggle('error', error);
@@ -68,7 +103,7 @@
                 f.value = state.settings[f.dataset.setting] ?? '';
             f.disabled = locked;
         }
-        for (const b of document.querySelectorAll('button')) b.disabled = locked;
+        for (const b of document.querySelectorAll('button:not([data-panel-toggle])')) b.disabled = locked;
         if (!locked) {
             $('backend-start').disabled = state.backend;
             $('backend-stop').disabled = !state.backend && !s.running && !s.usb;

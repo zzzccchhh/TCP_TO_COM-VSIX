@@ -2,7 +2,7 @@
     "name": "tcp2com",
     "displayName": "TCP2COM · 无线串口工作台",
     "description": "ESP-01S / ESP32-C5 / ESP32-S3 网络串口桥接、USB 配置与局域网多端工作台",
-    "version": "0.4.2",
+    "version": "0.5.0",
     "publisher": "tcp2com-local",
     "private": true,
     "engines": {

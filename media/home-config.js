@@ -124,8 +124,7 @@ window.createHomeConfig = (host) => {
         selectedGroup = 'common',
         confirmation,
         working = false;
-    const stored = host.vscode.getState?.() || {};
-    const drafts = stored.deviceDrafts || {};
+    const drafts = host.savedState.deviceDrafts || {};
     function secrets() {
         for (const group of ['ap', 'pc', 'shared']) {
             $(`cfg-password-${group}`).value = '';
@@ -141,7 +140,7 @@ window.createHomeConfig = (host) => {
     function keepDraft() {
         if (!model || !device) return;
         drafts[device] = clone(model);
-        host.vscode.setState?.({ ...stored, deviceDrafts: drafts });
+        host.saveState({ deviceDrafts: drafts });
     }
     function options(path, values) {
         const field = inputs.find((i) => i.path === path).field;
@@ -414,6 +413,7 @@ window.createHomeConfig = (host) => {
                 host.notice(action === 'connect' ? 'USB 已连接，请读取设备。' : 'USB 已断开。');
             });
     $('config-usb-settings').onclick = () => {
+        host.expandPanel('usb');
         $('usb-settings').scrollIntoView({ behavior: 'smooth', block: 'start' });
         document.querySelector('[data-setting=usb_port]').focus();
     };

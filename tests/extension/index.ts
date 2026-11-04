@@ -6,6 +6,11 @@ import { tmpdir } from 'node:os';
 export async function run() {
     const extension = vscode.extensions.getExtension('tcp2com-local.tcp2com');
     assert(extension, 'extension manifest is discoverable');
+    const testPort = Number(process.env.TCP2COM_TEST_PORT);
+    assert(Number.isInteger(testPort) && testPort > 0 && testPort <= 65535, 'isolated HTTP test port');
+    await vscode.workspace
+        .getConfiguration('tcp2com')
+        .update('port', testPort, vscode.ConfigurationTarget.Global);
     await vscode.workspace
         .getConfiguration('tcp2com')
         .update('listen', '0.0.0.0', vscode.ConfigurationTarget.Global);
@@ -21,7 +26,7 @@ export async function run() {
                 const report = JSON.parse(
                     await require('node:fs/promises').readFile(process.env.TCP2COM_VISUAL_REPORT, 'utf8'),
                 );
-                if (report.homepage && report.configVerified) {
+                if (report.homepage && report.configVerified && report.panelsVerified) {
                     verified = true;
                     break;
                 }
@@ -48,7 +53,7 @@ export async function run() {
         }
         assert(verified, 'real Webview loaded and synchronized via message transport');
     }
-    const response = await fetch('http://127.0.0.1:8765/');
+    const response = await fetch(`http://127.0.0.1:${testPort}/`);
     assert.equal(response.status, 200);
     const html = await response.text();
     assert(html.includes('window.__WIFI_BRIDGE__'));

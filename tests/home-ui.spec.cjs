@@ -63,6 +63,8 @@ async function setup(page, theme = 'dark') {
                           },
             });
             window.acquireVsCodeApi = () => ({
+                getState: () => JSON.parse(sessionStorage.getItem('home-view-state') || 'null'),
+                setState: (value) => sessionStorage.setItem('home-view-state', JSON.stringify(value)),
                 postMessage: (m) =>
                     setTimeout(() => {
                         let error = '';
@@ -128,6 +130,9 @@ async function setup(page, theme = 'dark') {
             window.__homeTest = {
                 state,
                 savedCalls,
+                refresh() {
+                    emit({ kind: 'state', data: structuredClone(state) });
+                },
                 remoteRead() {
                     state.snapshot.epoch++;
                     state.revision++;
@@ -167,7 +172,7 @@ async function setup(page, theme = 'dark') {
             const light = theme === 'light';
             await route.fulfill({
                 contentType: 'text/css',
-                body: `:root{--vscode-font-size:13px;--vscode-font-family:system-ui;--vscode-foreground:${light ? '#202020' : '#ddd'};--vscode-sideBar-background:${light ? '#f3f3f3' : '#181818'};--vscode-input-background:${light ? '#fff' : '#252526'};--vscode-input-foreground:${light ? '#222' : '#ddd'};--vscode-dropdown-background:${light ? '#fff' : '#252526'};--vscode-dropdown-foreground:${light ? '#222' : '#ddd'};--vscode-dropdown-border:${theme === 'contrast' ? '#f38518' : '#666'};--vscode-contrastBorder:#f38518;--vscode-focusBorder:#007acc;--vscode-list-focusBackground:#04395e;--vscode-list-focusForeground:#fff;--vscode-list-hoverBackground:#333;--vscode-button-background:#007acc;--vscode-button-foreground:#fff;--vscode-button-secondaryBackground:#444;--vscode-button-secondaryForeground:#fff;--vscode-descriptionForeground:#999;--vscode-panel-border:#555;--vscode-errorForeground:#f66}`,
+                body: `:root{--vscode-font-size:13px;--vscode-font-family:system-ui;--vscode-foreground:${light ? '#202020' : '#ddd'};--vscode-sideBar-background:${light ? '#f3f3f3' : '#181818'};--vscode-input-background:${light ? '#fff' : '#252526'};--vscode-input-foreground:${light ? '#222' : '#ddd'};--vscode-dropdown-background:${light ? '#fff' : '#252526'};--vscode-dropdown-foreground:${light ? '#222' : '#ddd'};--vscode-dropdown-border:${theme === 'contrast' ? '#f38518' : '#666'};--vscode-contrastBorder:#f38518;--vscode-focusBorder:#007acc;--vscode-list-focusBackground:#04395e;--vscode-list-focusForeground:#fff;--vscode-list-hoverBackground:${light ? '#e5e5e5' : '#333'};--vscode-toolbar-hoverBackground:${light ? '#e5e5e5' : '#333'};--vscode-button-background:#007acc;--vscode-button-foreground:#fff;--vscode-button-secondaryBackground:#444;--vscode-button-secondaryForeground:#fff;--vscode-descriptionForeground:#999;--vscode-panel-border:#555;--vscode-errorForeground:#f66}`,
             });
         } else if (['home.js', 'home-picker.js', 'home-config.js', 'home.css'].includes(name))
             await route.fulfill({
@@ -194,6 +199,88 @@ test('header removed and themed device picker supports Escape and keyboard commi
     await picker.press('End');
     await picker.press('Enter');
     await expect(page.locator('select[data-setting=device]')).toHaveValue('esp01s');
+});
+test('panels fold independently with keyboard, retain live status and stay usable while busy', async ({
+    page,
+}) => {
+    await setup(page);
+    await expect(page.locator('[data-panel-toggle]')).toHaveCount(6);
+    await expect(page.locator('.panel-body:not([hidden])')).toHaveCount(6);
+    const backend = page.getByRole('button', { name: '后端服务', exact: true });
+    await backend.focus();
+    await backend.press('Enter');
+    await expect(backend).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#backend-start')).toBeHidden();
+    await expect(page.locator('#backend-state')).toBeVisible();
+    await expect(page.locator('#panel-body-bridge')).toBeVisible();
+    await backend.press('Space');
+    await page.locator('#backend-start').click();
+    await backend.click();
+    await expect(page.locator('#backend-state')).toHaveText('运行中');
+    await page.evaluate(() => {
+        window.__homeTest.state.backend = false;
+        window.__homeTest.refresh();
+    });
+    await expect(page.locator('#backend-state')).toHaveText('已停止');
+    await expect(backend).toHaveAttribute('aria-expanded', 'false');
+    await page.evaluate(() => window.__homeTest.busy());
+    await expect(backend).toBeEnabled();
+    await backend.click();
+    await expect(page.locator('#backend-start')).toBeVisible();
+    await expect(page.locator('#backend-start')).toBeDisabled();
+});
+test('folding preserves live drafts and read receipt; persisted drafts and panel state survive reload without passwords', async ({
+    page,
+}) => {
+    await setup(page);
+    await page.locator('#config-read').click();
+    await page.getByRole('tab', { name: 'AP 热点', exact: true }).click();
+    await page.locator('#cfg-ap_ssid').fill('Folded AP');
+    await page.locator('#cfg-password-ap').fill('temporary-fold-password');
+    await page.getByRole('combobox', { name: '业务 COM', exact: true }).fill('COM-DRAFT');
+    await page.getByRole('button', { name: '业务桥接', exact: true }).click();
+    const config = page.getByRole('button', { name: '设备配置', exact: true });
+    await config.click();
+    await expect(page.locator('#config-editor')).toBeHidden();
+    await expect(page.locator('#save-settings')).toBeVisible();
+    await expect(page.locator('#notice')).toBeVisible();
+    await config.click();
+    await expect(page.getByRole('tab', { name: 'AP 热点', exact: true })).toHaveAttribute(
+        'aria-selected',
+        'true',
+    );
+    await expect(page.locator('#cfg-password-ap')).toHaveValue('temporary-fold-password');
+    await expect(page.locator('#config-preview')).toBeEnabled();
+    await expect(page.locator('[data-setting=com]')).toHaveValue('COM-DRAFT');
+    await page.locator('#cfg-ap_ssid').fill('Draft after folding');
+    await config.click();
+    const stored = await page.evaluate(() => JSON.parse(sessionStorage.getItem('home-view-state')));
+    expect(stored.collapsedPanels.bridge).toBe(true);
+    expect(stored.collapsedPanels.config).toBe(true);
+    expect(stored.deviceDrafts.c5.ap_ssid).toBe('Draft after folding');
+    expect(JSON.stringify(stored)).not.toContain('temporary-fold-password');
+    await page.reload();
+    await expect(page.locator('#panel-body-bridge')).toBeHidden();
+    await expect(page.locator('#panel-body-config')).toBeHidden();
+    await config.click();
+    await page.getByRole('tab', { name: 'AP 热点', exact: true }).click();
+    await expect(page.locator('#cfg-ap_ssid')).toHaveValue('Draft after folding');
+    await expect(page.locator('#cfg-password-ap')).toHaveValue('');
+    await expect(page.locator('#config-preview')).toBeDisabled();
+});
+test('USB shortcut expands its panel, and folding closes an open picker', async ({ page }) => {
+    await setup(page);
+    const usb = page.getByRole('button', { name: 'USB 日志与配置', exact: true });
+    await usb.click();
+    await expect(page.locator('#panel-body-usb')).toBeHidden();
+    await page.locator('#config-usb-settings').click();
+    await expect(usb).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('[data-setting=usb_port]')).toBeFocused();
+    await page.getByRole('combobox', { name: '配置连接', exact: true }).click();
+    await expect(page.getByRole('listbox')).toBeVisible();
+    await page.getByRole('button', { name: '设备配置', exact: true }).click();
+    await expect(page.getByRole('listbox')).toHaveCount(0);
+    await expect(page.locator('#panel-body-config')).toBeHidden();
 });
 test('inline config preserves groups, masks passwords and requires explicit save confirmation', async ({
     page,
@@ -321,5 +408,10 @@ for (const theme of ['dark', 'light', 'contrast'])
         expect(bounds.y).toBeGreaterThanOrEqual(0);
         expect(bounds.y + bounds.height).toBeLessThanOrEqual(760);
         await page.screenshot({ path: path.join(root, 'artifacts', `home-theme-${theme}.png`) });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await page.getByRole('combobox', { name: '分享网卡', exact: true }).press('Escape');
+        for (const toggle of await page.locator('[data-panel-toggle]').all()) await toggle.click();
+        await expect(page.locator('.panel-body:not([hidden])')).toHaveCount(0);
+        await page.screenshot({ path: path.join(root, 'artifacts', `home-panels-${theme}.png`) });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     });
