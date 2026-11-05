@@ -10,7 +10,7 @@ const rows = [
     { id: 'loopback', name: '本机专用', ip: '127.0.0.1', shareable: true },
     { id: 'wifi', name: 'WLAN', ip: '192.168.1.9', shareable: true },
 ];
-async function setup(page, theme = 'dark') {
+async function setup(page, theme = 'dark', networkLogs = false) {
     const { defaults, defaultConfig } = require('../dist/src/shared/model');
     const images = {};
     for (const id of ['first', 'second'])
@@ -42,6 +42,7 @@ async function setup(page, theme = 'dark') {
             let selected = rows[0];
             let readEpoch = null;
             const savedCalls = [];
+            const controlCalls = [];
             let all = rows;
             const emit = (m) => window.postMessage(m, '*');
             const network = () => ({
@@ -74,6 +75,9 @@ async function setup(page, theme = 'dark') {
                         else if (m.action === 'choose')
                             selected = all.find((r) => r.id === m.adapter && r.ip === m.ip && r.shareable);
                         else if (m.action === 'control') {
+                            controlCalls.push(m);
+                            if (m.operation === 'net-connect') { state.backend = true; state.snapshot.net_log = { connected: true, host: m.patch.net_log_host || state.settings.net_log_host, port: Number(m.patch.net_log_port || state.settings.net_log_port), message: '已连接', dropped: 0 }; }
+                            if (m.operation === 'net-disconnect') state.snapshot.net_log = null;
                             if (m.revision !== state.revision) error = '其他终端已更新设置';
                             else {
                                 Object.assign(state.settings, m.patch);
@@ -130,6 +134,7 @@ async function setup(page, theme = 'dark') {
             window.__homeTest = {
                 state,
                 savedCalls,
+                controlCalls,
                 refresh() {
                     emit({ kind: 'state', data: structuredClone(state) });
                 },
@@ -153,7 +158,7 @@ async function setup(page, theme = 'dark') {
                 },
             };
         },
-        { defaults, configDefaults: defaultConfig('c5'), rows, images },
+        { defaults, configDefaults: { ...defaultConfig('c5'), ...(networkLogs ? { log_enabled: true, log_port: 19082 } : {}) }, rows, images },
     );
     await page.route('http://home.test/**', async (route) => {
         const name = new URL(route.request().url()).pathname.slice(1);
@@ -204,8 +209,8 @@ test('panels fold independently with keyboard, retain live status and stay usabl
     page,
 }) => {
     await setup(page);
-    await expect(page.locator('[data-panel-toggle]')).toHaveCount(6);
-    await expect(page.locator('.panel-body:not([hidden])')).toHaveCount(6);
+    await expect(page.locator('[data-panel-toggle]')).toHaveCount(7);
+    await expect(page.locator('.panel-body:not([hidden])')).toHaveCount(7);
     const backend = page.getByRole('button', { name: '后端服务', exact: true });
     await backend.focus();
     await backend.press('Enter');
@@ -291,7 +296,7 @@ test('inline config preserves groups, masks passwords and requires explicit save
     const order = await page
         .locator('main > section')
         .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('aria-label')));
-    expect(order.slice(0, 4)).toEqual(['后端服务', '业务桥接', 'USB 日志与配置', '设备配置']);
+    expect(order.slice(0, 5)).toEqual(['后端服务', '业务桥接', 'USB 日志与配置', '网络日志', '设备配置']);
     await expect(page.locator('#config-preview')).toBeDisabled();
     await page.locator('#config-read').click();
     await expect(page.locator('#config-status')).toContainText('已在本页读取');
@@ -415,3 +420,25 @@ for (const theme of ['dark', 'light', 'contrast'])
         await page.screenshot({ path: path.join(root, 'artifacts', `home-panels-${theme}.png`) });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     });
+
+
+test('network log sidebar connects without a COM bridge, disconnects and exposes NVS settings', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 1000 });
+    await setup(page, 'dark', true);
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.locator('[data-setting=net_log_host]').fill('192.168.4.1');
+    await page.locator('[data-setting=net_log_port]').fill('19082');
+    await page.locator('#net-connect').click();
+    await expect(page.locator('#netlog-state')).toHaveText('已连接');
+    await expect(page.locator('#bridge-state')).toHaveText('已停止');
+    await page.locator('#net-disconnect').click();
+    await expect(page.locator('#netlog-state')).toHaveText('未连接');
+    expect(await page.evaluate(() => window.__homeTest.controlCalls.map((m) => m.operation))).toEqual(['net-connect', 'net-disconnect']);
+    await page.locator('#config-read').click();
+    await expect(page.getByLabel('设备 TCP 日志端口', { exact: true })).toHaveValue('19082');
+    await expect(page.getByLabel('设备 TCP 日志端口', { exact: true })).toBeEnabled();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(errors).toEqual([]);
+    await page.screenshot({ path: 'test-results/network-log-sidebar.png', fullPage: true });
+});

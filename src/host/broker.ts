@@ -182,6 +182,7 @@ export class BackendOwner {
                     for (const [method, args] of [
                         ['bridge', ['stop']],
                         ['usb', [false]],
+                        ['network_log', [false]],
                     ] as [string, any[]][]) {
                         const reply = await this.adapter.dispatch(
                             registered.token,
@@ -246,6 +247,8 @@ export class BackendOwner {
                             'bridge-restart',
                             'usb-connect',
                             'usb-disconnect',
+                            'net-connect',
+                            'net-disconnect',
                         ].includes(action),
                         '未知首页操作',
                     );
@@ -277,13 +280,14 @@ export class BackendOwner {
                         nextRevision = reply.revision;
                     }
                     if (action === 'save-settings') return true;
-                    if (['bridge-start', 'bridge-restart', 'usb-connect'].includes(action))
+                    if (['bridge-start', 'bridge-restart', 'usb-connect', 'net-connect'].includes(action))
                         await this.start();
                     const isBridge = action.startsWith('bridge-');
-                    const operation = isBridge ? action.slice(7) : action === 'usb-connect';
+                    const isNet = action.startsWith('net-');
+                    const operation = isBridge ? action.slice(7) : action === 'usb-connect' || action === 'net-connect';
                     const reply = await this.adapter.dispatch(
                         registered.token,
-                        isBridge ? 'bridge' : 'usb',
+                        isBridge ? 'bridge' : isNet ? 'network_log' : 'usb',
                         [operation],
                         nextRevision,
                     );

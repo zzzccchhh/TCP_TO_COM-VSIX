@@ -4,7 +4,7 @@ import { Service } from '../service/service';
 const secret = (n = 32) => randomBytes(n).toString('base64url');
 export class Unauthorized extends Error {}
 export const methods = new Set(
-    'initial ports poll update_settings bridge usb remember_draft read_device preview_save save_device import_config backup_config clear_logs export_logs reset_click peers revoke'.split(
+    'initial ports poll update_settings bridge usb network_log remember_draft read_device preview_save save_device import_config backup_config clear_logs export_logs reset_click peers revoke'.split(
         ' ',
     ),
 );

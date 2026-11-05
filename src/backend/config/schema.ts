@@ -23,6 +23,7 @@ export const network = [
     'up_kb',
     'down_kb',
 ];
+export const logFields = ['log_enabled', 'log_port'];
 export const station = ['ssid', 'static_ip', 'ip', 'gateway', 'netmask', 'dns'];
 const integer = (v: any, lo: number, hi: number) => Number.isInteger(v) && v >= lo && v <= hi;
 function text(v: any, label: string, max: number, min = 0) {
@@ -65,6 +66,10 @@ function subnet(ip: any, gateway: any, mask: any, ap = false) {
     } else assert(a !== g, 'STA IP 不能与网关相同');
 }
 export function validateConfig(c: Data, device: Device) {
+    if ('log_enabled' in c || 'log_port' in c) {
+        assert(device === 'c5' && typeof c.log_enabled === 'boolean' && integer(c.log_port, 1024, 65535), '网络日志开关或端口无效（1024～65535）');
+        assert(!c.log_enabled || (c.log_port !== 8081 && !((c.net_role ?? 0) === 0 && c.log_port === c.tcp_port) && !(c.net_role === 1 && c.log_port === c.local_port)), '网络日志端口与本机 TCP 端口冲突');
+    }
     assert(device !== 'esp01s', 'ESP-01S 不支持此配置接口');
     assert((device === 'c5' ? [0, 3, 4] : [0, 1, 2]).includes(c.link_mode), '请选择当前设备支持的业务接口');
     for (const [key, lo, hi] of [
@@ -152,6 +157,7 @@ export function publicConfig(input: any, device: Device, draft = false): Data {
     }
     for (const key of [...network, 'reset_pin', ...(device === 'c5' ? ['flow_pin'] : [])])
         if (Object.hasOwn(input, key)) c[key] = structuredClone(input[key]);
+    if (device === 'c5') for (const key of logFields) if (key in input) c[key] = structuredClone(input[key]);
     if ('config_api' in input) {
         assert(
             (device === 'c5' ? ['c5-config-2', 'c5-wbr-1'] : ['bridge-1']).includes(input.config_api),
@@ -207,8 +213,9 @@ export function changedConfig(
         '请更新 S3 固件并重新读取',
     );
     assert(!(device === 'c5' && 'flow_pin' in candidate && !('flow_pin' in base)), '设备未报告流控配置');
+    for (const key of logFields) assert(!(key in candidate) || key in base, '设备未报告网络日志配置，请升级固件并重新读取');
     const patch: Data = {};
-    for (const key of [...top, ...network, 'reset_pin', 'flow_pin'])
+    for (const key of [...top, ...network, ...logFields, 'reset_pin', 'flow_pin'])
         if (key in candidate && candidate[key] !== base[key]) patch[key] = candidate[key];
     if (base.migration_requires_setup && device === 'c5' && 'flow_pin' in base) {
         patch.link_mode = candidate.link_mode;

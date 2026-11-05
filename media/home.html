@@ -38,7 +38,7 @@
                         <dd id="listen-address">—</dd>
                     </dl>
                     <button type="button" class="link" data-action="listener">更改监听设置</button>
-                    <p class="hint">停止后端会同时释放桥接与 USB。</p>
+                    <p class="hint">停止后端会同时释放桥接、USB 与网络日志。</p>
                 </div>
             </section>
             <section aria-label="业务桥接" data-panel="bridge">
@@ -157,6 +157,12 @@
                         </button>
                     </div>
                 </div>
+            </section>
+            <section aria-label="网络日志" data-panel="netlog">
+                <div class="section-title"><h2><button type="button" class="panel-toggle" data-panel-toggle="netlog" aria-expanded="true" aria-controls="panel-body-netlog"><span class="panel-chevron" aria-hidden="true"></span><span>网络日志</span></button></h2><span id="netlog-state" class="badge" role="status" aria-label="网络日志状态">未连接</span></div>
+                <div class="panel-body" id="panel-body-netlog"><div class="two"><label>日志设备 IPv4<input data-setting="net_log_host" placeholder="192.168.4.1" spellcheck="false" /></label><label>日志目标端口<input data-setting="net_log_port" inputmode="numeric" /></label></div>
+                <div class="actions"><button type="button" data-control="net-connect" id="net-connect">连接网络日志</button><button type="button" class="secondary" data-control="net-disconnect" id="net-disconnect">断开网络日志</button><button type="button" class="secondary" id="net-use-port">使用已读取的设备端口</button><button type="button" class="secondary" data-action="workspace">查看运行日志</button></div>
+                <p id="netlog-detail">无需选择业务 COM；与 USB 同时可用。</p><p id="netlog-saved" role="status"></p></div>
             </section>
             <div class="edit-actions">
                 <button type="button" class="secondary" id="save-settings" data-control="save-settings">

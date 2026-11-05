@@ -75,7 +75,7 @@ let panelsVerified = false;
                             }
                     if (home) {
                         interacting = true;
-                        await expect(home.locator('[data-panel-toggle]')).toHaveCount(6);
+                        await expect(home.locator('[data-panel-toggle]')).toHaveCount(7);
                         for (const toggle of await home.locator('[data-panel-toggle]').all())
                             if ((await toggle.getAttribute('aria-expanded')) === 'false')
                                 await toggle.click();

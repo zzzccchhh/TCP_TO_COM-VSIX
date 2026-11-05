@@ -96,6 +96,9 @@
         $('bridge-state').classList.toggle('active', s.running);
         $('usb-state').textContent = s.usb ? (s.usb.connected ? '已连接' : '连接中') : '未连接';
         $('usb-state').classList.toggle('active', !!s.usb?.connected);
+        $('netlog-state').textContent = s.net_log?.connected ? '已连接' : s.net_log ? '重试中' : '未连接';
+        $('netlog-state').classList.toggle('active', !!s.net_log?.connected);
+        $('netlog-detail').textContent = s.net_log ? `${s.net_log.host}:${s.net_log.port} · ${s.net_log.message} · 丢弃 ${s.net_log.dropped} 条` : '无需选择业务 COM；与 USB 同时可用。';
         $('listen-address').textContent = `${state.listen}:${state.port}`;
         $('bridge-address').textContent = s.address;
         for (const f of fields) {
@@ -106,13 +109,16 @@
         for (const b of document.querySelectorAll('button:not([data-panel-toggle])')) b.disabled = locked;
         if (!locked) {
             $('backend-start').disabled = state.backend;
-            $('backend-stop').disabled = !state.backend && !s.running && !s.usb;
+            $('backend-stop').disabled = !state.backend && !s.running && !s.usb && !s.net_log;
             $('bridge-start').disabled = s.running;
             $('bridge-stop').disabled = !s.running;
             $('bridge-restart').disabled = !s.running;
             $('usb-connect').disabled =
                 !!s.usb || document.querySelector('[data-setting=device]').value === 'esp01s';
             $('usb-disconnect').disabled = !s.usb;
+            $('net-connect').disabled = !!s.net_log;
+            $('net-disconnect').disabled = !s.net_log;
+            $('net-use-port').disabled = !s.baseline?.log_port;
             $('save-settings').disabled = !dirty.size;
             $('sync-settings').disabled = !dirty.size;
         }
@@ -199,7 +205,7 @@
         b.addEventListener('click', () => {
             if (b.dataset.control) {
                 const operation = b.dataset.control;
-                const apply = !['bridge-stop', 'usb-disconnect'].includes(operation);
+                const apply = !['bridge-stop', 'usb-disconnect', 'net-disconnect'].includes(operation);
                 void act('control', {
                     operation,
                     patch: apply ? patch() : {},
@@ -217,7 +223,14 @@
                 });
             }
         });
-    $('adapter-select').addEventListener('change', () => {
+    $('net-use-port').addEventListener('click', () => {
+        if (!state?.snapshot.baseline?.log_port) return;
+        const input = fields.find((f) => f.dataset.setting === 'net_log_port');
+        input.value = String(state.snapshot.baseline.log_port);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        notice('已填写设备日志端口，点击连接网络日志生效。');
+    });
+    $('adapter-select').addEventListener('change' , () => {
         const row = network?.addresses[Number($('adapter-select').value)];
         if (row?.shareable) {
             qrPending = true;

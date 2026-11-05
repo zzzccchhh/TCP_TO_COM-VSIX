@@ -13,6 +13,7 @@ import {
 } from '../../shared/model';
 import { Store, cleanState } from '../storage/state';
 import { BridgeEngine } from '../bridge/engine';
+import { NetworkLogMonitor, logTarget } from './network-log';
 import { USBMonitor } from '../usb/monitor';
 import { ConfigClient, HTTPConfig, USBConfig } from '../config/client';
 import { changedConfig, network, publicConfig } from '../config/schema';
@@ -34,6 +35,7 @@ export class Service {
     logDropped = 0;
     engine: BridgeEngine;
     usbMonitor?: USBMonitor;
+    netLog?: NetworkLogMonitor;
     reset = new ResetControl();
     client?: ConfigClient;
     private saveTimer?: NodeJS.Timeout;
@@ -59,7 +61,7 @@ export class Service {
             id: ++this.cursor,
             time: new Date().toLocaleTimeString('en-GB', { hour12: false }),
             source,
-            level: source === 'usb' ? (text.match(/^\s*([EWIDV])\s+\(\s*\d+\s*\)/)?.[1] ?? '') : '',
+            level: ['usb', 'net'].includes(source) ? (text.match(/^\s*([EWIDV])\s+\(\s*\d+\s*\)/)?.[1] ?? '') : '',
             text,
         });
         if (this.logs.length > 3000) {
@@ -160,6 +162,20 @@ export class Service {
                     this.busy = false;
                 }
             }
+            case 'network_log': {
+                assert(typeof args[0] === 'boolean' && !this.busy, '日志连接操作格式不正确或正在处理');
+                const target = args[0] ? logTarget(this.settings.net_log_host, this.settings.net_log_port) : null;
+                this.busy = true;
+                try {
+                    await this.netLog?.close();
+                    this.netLog = undefined;
+                    if (target) {
+                        this.netLog = new NetworkLogMonitor(target.host, target.port, (s) => this.log(s, 'net'), (s) => this.log(s));
+                        this.netLog.start();
+                    }
+                    return true;
+                } finally { this.busy = false; }
+            }
             case 'usb': {
                 assert(typeof args[0] === 'boolean', 'USB 操作格式不正确');
                 assert(!this.busy && (!this.configBusy || !args[0]), '连接或配置请求进行中');
@@ -242,7 +258,9 @@ export class Service {
                     object(doc) && ['c5-user-config-v1', 'wifi-bridge-user-config-v1'].includes(doc.format),
                     '不支持的设备备份格式',
                 );
-                return publicConfig(doc.config, this.settings.device, true);
+                const imported = publicConfig(doc.config, this.settings.device, true);
+                for (const key of ['log_enabled', 'log_port']) if (!(key in imported) && this.baseline && key in this.baseline) imported[key] = this.baseline[key];
+                return imported;
             }
             case 'backup_config':
                 return {
@@ -257,7 +275,7 @@ export class Service {
             case 'export_logs':
                 return (
                     this.logs
-                        .map((r) => `${r.time} [${r.source === 'usb' ? 'USB / ESP' : '上位机'}] ${r.text}`)
+                        .map((r) => `${r.time} [${({ usb: 'USB / ESP', net: '网络 / ESP' } as Data)[r.source] ?? '上位机'}] ${r.text}`)
                         .join('\n') + '\n'
                 );
             case 'reset_click': {
@@ -319,7 +337,7 @@ export class Service {
         assert(this.baseline && this.client, '请先从当前连接读取设备，之后才能保存');
         assert(object(edited), '配置必须是对象');
         const candidate = structuredClone(edited);
-        for (const key of [...network, 'flow_pin', 'reset_pin'])
+        for (const key of [...network, 'log_enabled', 'log_port', 'flow_pin', 'reset_pin'])
             if (!(key in this.baseline)) delete candidate[key];
         return changedConfig(this.baseline, candidate, passwords, clear, this.settings.device);
     }
@@ -367,6 +385,7 @@ export class Service {
                         (k) =>
                             ![
                                 'usb_port',
+                                'net_log_host', 'net_log_port',
                                 'usb_baud',
                                 'usb_log',
                                 'config_url',
@@ -392,6 +411,7 @@ export class Service {
             queued: e.queued,
             peak: e.peak,
             usb: this.usbMonitor?.status() ?? null,
+            net_log: this.netLog?.status() ?? null,
             config_busy: this.configBusy,
             config_status: this.status,
             baseline: structuredClone(this.baseline),
@@ -405,7 +425,7 @@ export class Service {
         };
     }
     async importState(text: string) {
-        assert(!this.engine.running && !this.usbMonitor && !this.configBusy, '请先停止桥接与 USB');
+        assert(!this.engine.running && !this.usbMonitor && !this.netLog && !this.configBusy, '请先停止桥接、USB 与网络日志');
         const clean = cleanState(parseJSON(text.replace(/^\uFEFF/, '')));
         this.settings = clean.settings;
         this.drafts = clean.drafts;
@@ -420,6 +440,7 @@ export class Service {
         this.reset.close();
         await this.engine.stop();
         await this.usbMonitor?.close();
+        await this.netLog?.close();
         this.save();
         await this.persist;
     }

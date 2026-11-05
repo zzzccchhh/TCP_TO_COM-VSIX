@@ -3,7 +3,7 @@ window.createHomeConfig = (host) => {
     const $ = (id) => document.getElementById(id);
     const clone = (value) => structuredClone(value);
     const optional = new Set(
-        'flow_pin reset_pin net_role auto_reconnect remote_ip remote_port local_port reconnect_ms connect_timeout_ms up_kb down_kb'.split(
+        'log_enabled log_port flow_pin reset_pin net_role auto_reconnect remote_ip remote_port local_port reconnect_ms connect_timeout_ms up_kb down_kb'.split(
             ' ',
         ),
     );
@@ -25,6 +25,8 @@ window.createHomeConfig = (host) => {
             ],
             ['band', 'Wi-Fi 频段', []],
             ['tcp_port', '设备 TCP 服务端端口', 'number'],
+            ['log_enabled', '启用网络日志（USB 同时保留）', 'boolean'],
+            ['log_port', '设备 TCP 日志端口', 'number'],
             [
                 'net_role',
                 '设备网络角色',
@@ -237,7 +239,7 @@ window.createHomeConfig = (host) => {
                 (['pc', 'shared'].includes(i.group) &&
                     ['ip', 'gateway', 'netmask', 'dns'].includes(i.key) &&
                     !source?.static_ip);
-            i.field.disabled = locked || !model || i.label.hidden;
+            i.field.disabled = locked || !model || i.label.hidden || (['log_enabled', 'log_port'].includes(i.path) && (!baseline || !(i.path in baseline)));
         }
         for (const tab of document.querySelectorAll('[data-group]')) {
             tab.disabled = locked;
@@ -370,7 +372,7 @@ window.createHomeConfig = (host) => {
                     revision: c.revision,
                 });
                 host.notice(
-                    reply.data.saved ? '设备已确认保存并请求重启；请重新读取核对。' : '没有需要保存的修改。',
+                    reply.data.saved ? `设备已确认保存并请求重启；${c.edited.log_enabled ? '日志端口 ' + c.edited.log_port + '，请核对目标 IP 后重新连接网络日志。' : '请重新读取核对。'}` : '没有需要保存的修改。',
                 );
             } finally {
                 invalidate();

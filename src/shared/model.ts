@@ -28,6 +28,8 @@ export const defaults: Data = {
     control_port: '8081',
     no_reset_ui: false,
     verbose: false,
+    net_log_host: '',
+    net_log_port: '8082',
     usb_port: '',
     usb_baud: '115200',
     usb_log: '',
@@ -52,6 +54,7 @@ export const formFields: Data = {
         'verbose',
     ],
     usb_form: ['usb_port', 'usb_baud', 'usb_log'],
+    net_log_form: ['net_log_host', 'net_log_port'],
 };
 export const draftFields: Data = {
     common: [
@@ -62,6 +65,8 @@ export const draftFields: Data = {
         'band',
         'baud',
         'tcp_port',
+        'log_enabled',
+        'log_port',
         'net_role',
         'auto_reconnect',
         'remote_ip',
@@ -206,7 +211,7 @@ export function fromDraft(draft: Data, device: Device): Data {
             const value = draft?.[group]?.[key];
             if (value === undefined) continue;
             const target = ['pc', 'shared'].includes(group) ? out[group] : out;
-            target[key] = typeof target[key] === 'number' && /^\d+$/.test(value) ? Number(value) : value;
+            target[key] = (key === 'log_port' || typeof target[key] === 'number') && /^\d+$/.test(value) ? Number(value) : value;
         }
     if (device === 'c5' && [1, 2].includes(out.link_mode)) out.link_mode = -1;
     return out;

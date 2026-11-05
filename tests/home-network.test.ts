@@ -190,7 +190,7 @@ test('homepage rejects stale writes and invalid bridge settings before startup',
     assert.equal(owner.service.settings.com, 'COM42');
     assert.equal(owner.adapter.revision, 1);
 });
-test('stopping a bridge preserves independent USB; stopping backend closes both', async (t) => {
+test('stopping a bridge preserves USB and network logs; stopping backend closes all', async (t) => {
     const owner = await ownerFixture(t);
     let closed = 0;
     owner.service.usbMonitor = {
@@ -199,12 +199,17 @@ test('stopping a bridge preserves independent USB; stopping backend closes both'
         },
         status: () => ({ connected: true }),
     } as any;
+    let logClosed = 0;
+    owner.service.netLog = { close: async () => { logClosed++; }, status: () => ({ connected: true }) } as any;
     await owner.call('home-control', ['bridge-stop', {}, 0], 'home');
     assert.equal(closed, 0);
+    assert.equal(logClosed, 0);
     assert(owner.service.usbMonitor);
     await owner.call('start', [], 'home');
     await owner.call('stop', [], 'home');
     assert.equal(closed, 1);
+    assert.equal(logClosed, 1);
+    assert.equal(owner.service.netLog, undefined);
     assert.equal(owner.service.usbMonitor, undefined);
     assert.equal(owner.http, undefined);
 });
